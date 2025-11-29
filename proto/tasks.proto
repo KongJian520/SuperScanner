@@ -1,0 +1,119 @@
+syntax = "proto3";
+
+package tasks;
+
+import "google/protobuf/timestamp.proto";
+// Task entity
+
+service Tasks {
+  rpc ListAllTasks (ListAllTasksRequest) returns (ListTasksResponse);
+  rpc CreateTask (CreateTaskRequest) returns (CreateTaskResponse);
+  rpc DeleteTask (DeleteTaskRequest) returns (DeleteTaskResponse);
+  rpc GetTask (GetTaskRequest) returns (GetTaskResponse);
+  // Start a task (server will spawn the configured command, or use the
+  // provided `command` override). The server should update task status to RUNNING.
+  rpc StartTask (StartTaskRequest) returns (StartTaskResponse);
+  // Stop a running task. The server should attempt to terminate the process
+  // and update task status accordingly.
+  rpc StopTask (StopTaskRequest) returns (StopTaskResponse);
+  rpc UpdateTask (UpdateTaskRequest) returns (UpdateTaskResponse);
+
+}
+message Task {
+  // UUID string
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  TaskStatus status = 4;
+  // Timestamp when the task was created
+  google.protobuf.Timestamp created_at = 5;
+}
+// Task status enum
+enum TaskStatus {
+  TASK_STATUS_UNSPECIFIED = 0;
+  PENDING = 1;
+  RUNNING = 2;
+  DONE = 3;
+  FAILED = 4;
+}
+
+// 列出所有任务
+message ListAllTasksRequest {}
+
+message ListTasksResponse {
+  repeated Task tasks = 1;
+  string next_page_token = 2;
+}
+
+// 创建任务
+message CreateTaskRequest {
+  string name = 1;
+  string description = 2;
+}
+
+message CreateTaskResponse {
+  Task task = 1;
+}
+
+// 根据UUID删除任务
+message DeleteTaskRequest {
+  string id = 1; // UUID
+}
+
+message DeleteTaskResponse {
+  bool success = 1;
+  int32 deleted_count = 2; // usually 0 or 1
+}
+
+// Get single task
+message GetTaskRequest {
+  string id = 1;
+}
+
+message GetTaskResponse {
+  Task task = 1;
+}
+
+// Start/Stop task messages
+// Request to start a task. If `command` is empty, server can use a
+// Request to start a task. The command to execute is defined server-side
+// (task-default). Clients MUST only provide the `id` of the task to start.
+message StartTaskRequest {
+  // UUID of the task to start
+  string id = 1;
+}
+
+message StartTaskResponse {
+  bool success = 1;
+  // Optional human-readable message or error
+  string message = 2;
+}
+
+// Request to stop a running task
+message StopTaskRequest {
+  // UUID of the task to stop
+  string id = 1;
+}
+
+message StopTaskResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+
+// Update task request: identify task by `id` and provide new values for
+// `name` and/or `description`. Fields left empty will be treated as no-op.
+message UpdateTaskRequest {
+  // UUID of the task to update
+  string id = 1;
+  // New name for the task (optional). If empty, name is not changed.
+  string name = 2;
+  // New description for the task (optional). If empty, description is not changed.
+  string description = 3;
+}
+
+// Update task response: returns the updated task and success flag.
+message UpdateTaskResponse {
+  Task task = 1;
+  bool success = 2;
+}
