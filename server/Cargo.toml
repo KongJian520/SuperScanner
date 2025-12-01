@@ -12,7 +12,7 @@ tracing-subscriber.workspace = true
 tracing-appender.workspace = true
 once_cell.workspace = true
 tokio.workspace = true
-sqlx.workspace = true
+sqlx = { workspace = true, features = ["sqlite", "runtime-tokio-native-tls"] }
 rustls.workspace = true
 anyhow.workspace = true
 clap.workspace = true
@@ -24,6 +24,12 @@ thiserror.workspace = true
 async-trait.workspace = true
 uuid.workspace = true
 tonic-prost.workspace = true
+serde_json = "1"
+serde = { version = "1", features = ["derive"] }
+toml = "0.9.8"
+[dev-dependencies]
+tempfile = "3"
+
 [build-dependencies]
 tonic-prost-build.workspace = true
 tonic-build.workspace = true

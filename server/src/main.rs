@@ -1,19 +1,18 @@
+use crate::proto::tasks_svc;
+use crate::utils::cli::Cli;
 use crate::utils::logging;
+use crate::utils::signal::wait_for_double_ctrl_c;
 use anyhow::Context;
 use clap::Parser;
 use std::net::SocketAddr;
 use std::path::PathBuf;
-use tracing::{error, info, trace, warn};
 use tonic::transport::{Identity, Server, ServerTlsConfig};
+use tracing::{error, info};
 use utils::ROOT_DIR;
-use crate::proto::tasks_svc;
-use crate::utils::cli::Cli;
-use crate::utils::signal::wait_for_double_ctrl_c;
 
-mod store;
 mod proto;
 mod utils;
-
+mod services;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -22,7 +21,8 @@ async fn main() -> anyhow::Result<()> {
             .await
             .context("failed to create scanner projects dir")?;
     }
-    let _guard = logging::init(PathBuf::from(ROOT_DIR.join("logs")));
+    // 主程序日志放在 `ROOT_DIR` 下（server.log）
+    let _guard = logging::init(PathBuf::from(ROOT_DIR.clone()));
     let args = Cli::parse();
     let use_tls = args.tls;
     let addr: SocketAddr = format!("{}:{}", args.ip, args.port)
@@ -42,13 +42,8 @@ async fn main() -> anyhow::Result<()> {
         info!("Server starting WITHOUT TLS on {}", addr);
     }
 
-    let store = store::sqlite_db::SqliteStore::new(ROOT_DIR.clone())
-        .await
-        .context("failed to create sqlite store")?;
-    let store = std::sync::Arc::new(store);
-
     server_builder
-        .add_service(tasks_svc(store))
+        .add_service(tasks_svc())
         .serve_with_shutdown(addr, wait_for_double_ctrl_c())
         .await
         .map_err(|e| {

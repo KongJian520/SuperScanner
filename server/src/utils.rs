@@ -1,10 +1,9 @@
-pub mod logging;
 pub mod cli;
+pub mod logging;
 pub mod signal;
 
-use std::{env, path::PathBuf};
 use once_cell::sync::Lazy;
-
+use std::{env, path::PathBuf};
 
 pub static ROOT_DIR: Lazy<PathBuf> = Lazy::new(|| {
     let base = if let Ok(env_dir) = env::var("SUPPERSCANNER_HOMEDIR") {

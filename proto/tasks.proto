@@ -1,119 +1,148 @@
 syntax = "proto3";
 
-package tasks;
+// 定义包名为 tasks.v1，利用版本号管理 API 兼容性
+// 如果未来有破坏性变更，可以创建 tasks.v2
+package tasks.v1;
 
 import "google/protobuf/timestamp.proto";
-// Task entity
+import "google/protobuf/empty.proto";
 
+// Tasks 服务定义了管理和执行 IP 扫描任务的接口
 service Tasks {
-  rpc ListAllTasks (ListAllTasksRequest) returns (ListTasksResponse);
-  rpc CreateTask (CreateTaskRequest) returns (CreateTaskResponse);
-  rpc DeleteTask (DeleteTaskRequest) returns (DeleteTaskResponse);
-  rpc GetTask (GetTaskRequest) returns (GetTaskResponse);
-  // Start a task (server will spawn the configured command, or use the
-  // provided `command` override). The server should update task status to RUNNING.
-  rpc StartTask (StartTaskRequest) returns (StartTaskResponse);
-  // Stop a running task. The server should attempt to terminate the process
-  // and update task status accordingly.
-  rpc StopTask (StopTaskRequest) returns (StopTaskResponse);
-  rpc UpdateTask (UpdateTaskRequest) returns (UpdateTaskResponse);
+  rpc ListTasks (ListTasksRequest) returns (ListTasksResponse);
 
+  // CreateTask 创建一个新的扫描任务
+  // 任务创建后默认状态通常为 PENDING
+  rpc CreateTask (CreateTaskRequest) returns (Task);
+
+  // DeleteTask 删除指定任务
+  // 如果任务不存在，返回 NOT_FOUND 错误；如果删除成功，返回 Empty
+  rpc DeleteTask (DeleteTaskRequest) returns (google.protobuf.Empty);
+
+  // GetTask 获取单个任务的详细信息
+  rpc GetTask (GetTaskRequest) returns (Task);
+  
+  // StartTask 触发任务开始执行
+  // 服务端应将状态更新为 RUNNING，并开始扫描进程
+  // 如果任务已经在运行，应返回错误
+  rpc StartTask (StartTaskRequest) returns (Task);
+
+  // StopTask 停止正在运行的任务
+  // 服务端应尝试终止扫描进程，并将状态更新为 STOPPED
+  rpc StopTask (StopTaskRequest) returns (Task);
 }
+
+// 任务实体对象，包含任务的所有元数据和状态
 message Task {
-  // UUID string
+  // 任务的唯一标识符 (通常为 UUID)
   string id = 1;
+
+  // 任务名称，用于显示
   string name = 2;
+
+  // 任务的详细描述
   string description = 3;
-  TaskStatus status = 4;
-  // Timestamp when the task was created
-  google.protobuf.Timestamp created_at = 5;
+
+  // 扫描目标列表
+  // 使用 string 存储，以提高兼容性和可读性
+  // 格式示例: 
+  // - 单个 IP: "192.168.1.1", "2001:db8::1"
+  // - CIDR 网段: "192.168.1.0/24", "10.0.0.0/8"
+  repeated string targets = 4;
+
+  // 当前任务状态
+  TaskStatus status = 5;
+  
+  // 进程退出码 (仅在任务结束时有效)
+  // 0 通常表示成功，非 0 表示有错误发生
+  int32 exit_code = 6; 
+
+  // 错误信息详情
+  // 仅在 status 为 FAILED 时填充，用于排查问题
+  string error_message = 7;
+
+  // 任务创建时间
+  google.protobuf.Timestamp created_at = 8;
+
+  // 任务最后一次更新的时间 (包括状态变更、重命名等)
+  google.protobuf.Timestamp updated_at = 9;
+  
+  // 任务实际开始运行的时间 (从 PENDING 转为 RUNNING 的时间点)
+  google.protobuf.Timestamp started_at = 10;
+
+  // 任务结束时间 (进入 DONE, FAILED 或 STOPPED 的时间点)
+  google.protobuf.Timestamp finished_at = 11;
 }
-// Task status enum
+
+// 任务状态枚举
 enum TaskStatus {
+  // 默认值，不应使用，用于检测是否未初始化
   TASK_STATUS_UNSPECIFIED = 0;
+  
+  // 任务已创建，等待被调度执行
   PENDING = 1;
+  
+  // 任务正在执行中
   RUNNING = 2;
+  
+  // 任务执行成功结束
   DONE = 3;
+  
+  // 任务执行失败 (如扫描器崩溃、网络错误等)
   FAILED = 4;
+  
+  // 任务被用户手动停止
+  STOPPED = 5;
+
+  //暂停（稍后会继续）
+  PAUSED = 6;  
 }
 
-// 列出所有任务
-message ListAllTasksRequest {}
+// 获取任务列表请求
+message ListTasksRequest {
 
+}
+
+// 获取任务列表响应
 message ListTasksResponse {
+  // 任务列表(所有)
   repeated Task tasks = 1;
-  string next_page_token = 2;
+
 }
 
-// 创建任务
+// 创建任务请求
 message CreateTaskRequest {
+  // 任务名称 (必填)
   string name = 1;
+
+  // 任务描述 (选填)
   string description = 2;
+
+  // 扫描目标列表 (必填)
+  // 支持 IP 或 CIDR 格式
+  repeated string targets = 3;
 }
 
-message CreateTaskResponse {
-  Task task = 1;
-}
-
-// 根据UUID删除任务
+// 删除任务请求
 message DeleteTaskRequest {
-  string id = 1; // UUID
+  // 要删除的任务 ID
+  string id = 1;
 }
 
-message DeleteTaskResponse {
-  bool success = 1;
-  int32 deleted_count = 2; // usually 0 or 1
-}
-
-// Get single task
+// 获取单个任务请求
 message GetTaskRequest {
+  // 任务 ID
   string id = 1;
 }
 
-message GetTaskResponse {
-  Task task = 1;
-}
-
-// Start/Stop task messages
-// Request to start a task. If `command` is empty, server can use a
-// Request to start a task. The command to execute is defined server-side
-// (task-default). Clients MUST only provide the `id` of the task to start.
+// 开始任务请求
 message StartTaskRequest {
-  // UUID of the task to start
+  // 要启动的任务 ID
   string id = 1;
 }
 
-message StartTaskResponse {
-  bool success = 1;
-  // Optional human-readable message or error
-  string message = 2;
-}
-
-// Request to stop a running task
+// 停止任务请求
 message StopTaskRequest {
-  // UUID of the task to stop
+  // 要停止的任务 ID
   string id = 1;
-}
-
-message StopTaskResponse {
-  bool success = 1;
-  string message = 2;
-}
-
-
-// Update task request: identify task by `id` and provide new values for
-// `name` and/or `description`. Fields left empty will be treated as no-op.
-message UpdateTaskRequest {
-  // UUID of the task to update
-  string id = 1;
-  // New name for the task (optional). If empty, name is not changed.
-  string name = 2;
-  // New description for the task (optional). If empty, description is not changed.
-  string description = 3;
-}
-
-// Update task response: returns the updated task and success flag.
-message UpdateTaskResponse {
-  Task task = 1;
-  bool success = 2;
 }
