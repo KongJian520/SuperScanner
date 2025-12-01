@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+package server.v1;
+
+// ServerInfo 服务：查询服务器信息（主机名、OS、uptime、资源信息等）。
+service ServerInfo {
+  rpc GetInfo (ServerInfoRequest) returns (ServerInfoResponse);
+}
+
+message ServerInfoRequest {
+  // 是否包含动态指标（memory/disk/network 等）。
+  bool include_metrics = 1;
+}
+
+message NetworkInterface {
+  string name = 1;
+  repeated string ip_addresses = 2;
+}
+
+message ServerInfoResponse {
+  string hostname = 1;
+  string os = 2;
+  uint64 uptime_seconds = 3;
+  int32 cpu_cores = 4;
+  uint64 memory_total_bytes = 5;
+  uint64 memory_free_bytes = 6;
+  string version = 7;
+  // 可选：留空以保持跨平台兼容。实现中目前不填充 load_average。
+  repeated double load_average = 8;
+  uint64 disk_total_bytes = 9;
+  uint64 disk_free_bytes = 10;
+  repeated NetworkInterface network_interfaces = 11;
+}

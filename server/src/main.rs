@@ -1,4 +1,4 @@
-use crate::proto::tasks_svc;
+use crate::proto::{tasks_svc, server_info_svc};
 use crate::utils::cli::Cli;
 use crate::utils::logging;
 use crate::utils::signal::wait_for_double_ctrl_c;
@@ -44,6 +44,7 @@ async fn main() -> anyhow::Result<()> {
 
     server_builder
         .add_service(tasks_svc())
+        .add_service(server_info_svc())
         .serve_with_shutdown(addr, wait_for_double_ctrl_c())
         .await
         .map_err(|e| {
