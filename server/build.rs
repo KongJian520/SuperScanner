@@ -5,8 +5,8 @@ fn main() {
         .join("..")
         .join("proto");
     // Use the compiler-provided OUT_DIR so `tonic::include_proto!` can find generated files
- tonic_prost_build::configure()
-    .compile_protos(
+    tonic_prost_build::configure()
+        .compile_protos(
             &["tasks.proto", "server_info.proto"],
             &[proto_root.to_str().unwrap()],
         )

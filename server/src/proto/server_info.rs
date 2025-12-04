@@ -1,11 +1,12 @@
 use async_trait::async_trait;
 use tonic::{Request, Response, Status};
 
-use sysinfo::{System, SystemExt, DiskExt, NetworksExt};
+// 注意：如果您的Cargo.toml中没有if-addrs, tonic, async-trait, sysinfo等依赖，需要添加。
+// sysinfo 0.29.0+ 版本中，total_memory/free_memory 返回的是 bytes。
+use sysinfo::Disks;
 
-use crate::proto::server_info_proto::{
-    NetworkInterface, ServerInfoRequest, ServerInfoResponse, server_info_server,
-};
+// 假设这些路径和结构体在您的项目中是正确的
+use crate::proto::server_info_proto::{server_info_server, ServerInfoRequest, ServerInfoResponse};
 
 pub struct ServerInfoService;
 
@@ -21,18 +22,21 @@ impl server_info_server::ServerInfo for ServerInfoService {
         &self,
         req: Request<ServerInfoRequest>,
     ) -> Result<Response<ServerInfoResponse>, Status> {
-        let include_metrics = req.get_ref().include_metrics;
+        // ServerInfoRequest currently has no fields; ignore req
 
         // Perform blocking system calls in a blocking thread to avoid blocking the tokio runtime.
         let collect = tokio::task::spawn_blocking(move || -> Result<ServerInfoResponse, String> {
-            // Initialize and refresh system info
-            let mut sys = sysinfo::System::new_all();
+            // 初始化 system info，使用 new() 而不是 new_all()，然后按需刷新。
+            let mut sys = sysinfo::System::new();
+
+            // 刷新所有必要的组件
+            // 注意: new() 只初始化一次，需要刷新才能获取最新数据
             sys.refresh_all();
 
             // Hostname and OS
-            let hostname = sys.host_name().unwrap_or_default();
-            let os_name = sys.name().unwrap_or_default();
-            let os_version = sys.os_version().unwrap_or_default();
+            let hostname = sysinfo::System::host_name().unwrap_or_default();
+            let os_name = sysinfo::System::name().unwrap_or_default();
+            let os_version = sysinfo::System::os_version().unwrap_or_default();
             let os = if os_version.is_empty() {
                 os_name.clone()
             } else {
@@ -40,54 +44,32 @@ impl server_info_server::ServerInfo for ServerInfoService {
             };
 
             // Uptime (seconds)
-            let uptime_seconds = sys.uptime();
+            let uptime_seconds = sysinfo::System::uptime();
 
             // CPU cores (from sysinfo cpus length)
             let cpu_cores = sys.cpus().len() as i32;
 
-            // Memory: sysinfo returns KB for total/free, convert to bytes
-            let memory_total_bytes = sys.total_memory().saturating_mul(1024) as u64;
-            let memory_free_bytes = sys.free_memory().saturating_mul(1024) as u64;
+            // Memory: sysinfo 0.29.0+ 返回的是 bytes，因此移除 *1024 的乘法。
+            let memory_total_bytes = sys.total_memory();
+            let memory_free_bytes = sys.free_memory();
 
-            // Disks: sum across disks
+            // Disks: sum across disks using sysinfo (disk feature enabled)
             let mut disk_total: u64 = 0;
             let mut disk_free: u64 = 0;
-            for d in sys.disks() {
-                disk_total = disk_total.saturating_add(d.total_space());
-                disk_free = disk_free.saturating_add(d.available_space());
-            }
 
-            // Network interfaces: use if_addrs to collect IP addresses per interface.
-            let mut interfaces: Vec<NetworkInterface> = Vec::new();
-            match if_addrs::get_if_addrs() {
-                Ok(ifaces) => {
-                    use std::collections::HashMap;
-                    let mut map: HashMap<String, Vec<String>> = HashMap::new();
-                    for ifa in ifaces {
-                        let name = ifa.name.clone();
-                        let ip = ifa.ip().to_string();
-                        map.entry(name).or_default().push(ip);
-                    }
-                    for (name, ips) in map {
-                        interfaces.push(NetworkInterface { name, ip_addresses: ips });
-                    }
-                }
-                Err(_) => {
-                    // Fallback: include interface names from sysinfo (without IPs)
-                    for (name, _data) in sys.networks().iter() {
-                        interfaces.push(NetworkInterface {
-                            name: name.clone(),
-                            ip_addresses: Vec::new(),
-                        });
-                    }
-                }
+            let disks = Disks::new_with_refreshed_list();
+            for disk in disks.list() {
+                // 将所有磁盘的总大小和可用大小相加
+                disk_total = disk_total.saturating_add(disk.total_space());
+                disk_free = disk_free.saturating_add(disk.available_space());
+                // println!("{:?}: {:?}", disk.name(), disk.kind()); // 移除调试输出
             }
 
             // Version from compile-time package version
             let version = env!("CARGO_PKG_VERSION").to_string();
 
             // Build response with collected values
-            let mut resp = ServerInfoResponse {
+            let resp = ServerInfoResponse {
                 hostname,
                 os,
                 uptime_seconds,
@@ -95,21 +77,10 @@ impl server_info_server::ServerInfo for ServerInfoService {
                 memory_total_bytes,
                 memory_free_bytes,
                 version,
-                load_average: Vec::new(),
                 disk_total_bytes: disk_total,
                 disk_free_bytes: disk_free,
-                network_interfaces: interfaces,
+                load_average: Vec::new(), // 保持原结构体初始化方式
             };
-
-            // If caller doesn't want metrics, clear the expensive/volatile fields
-            if !include_metrics {
-                resp.uptime_seconds = 0;
-                resp.memory_total_bytes = 0;
-                resp.memory_free_bytes = 0;
-                resp.disk_total_bytes = 0;
-                resp.disk_free_bytes = 0;
-                resp.network_interfaces = Vec::new();
-            }
 
             Ok(resp)
         })

@@ -1,7 +1,7 @@
+use std::time::Duration;
 // src/utils/signal.rs
 use tokio::time::Instant;
-use std::time::Duration;
-use tracing::{info, warn, error};
+use tracing::{error, info, warn};
 
 /// 等待双击 Ctrl+C 的信号
 /// 该函数会在满足退出条件时返回，从而触发 Server Shutdown

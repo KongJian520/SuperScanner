@@ -1,4 +1,4 @@
-use crate::proto::{tasks_svc, server_info_svc};
+use crate::proto::{server_info_svc, tasks_svc};
 use crate::utils::cli::Cli;
 use crate::utils::logging;
 use crate::utils::signal::wait_for_double_ctrl_c;
@@ -11,8 +11,8 @@ use tracing::{error, info};
 use utils::ROOT_DIR;
 
 mod proto;
-mod utils;
 mod services;
+mod utils;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -22,7 +22,7 @@ async fn main() -> anyhow::Result<()> {
             .context("failed to create scanner projects dir")?;
     }
     // 主程序日志放在 `ROOT_DIR` 下（server.log）
-    let _guard = logging::init(PathBuf::from(ROOT_DIR.clone()));
+    let _guard = logging::init(ROOT_DIR.clone());
     let args = Cli::parse();
     let use_tls = args.tls;
     let addr: SocketAddr = format!("{}:{}", args.ip, args.port)

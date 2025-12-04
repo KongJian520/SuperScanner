@@ -17,18 +17,20 @@ rustls.workspace = true
 anyhow.workspace = true
 clap.workspace = true
 tonic = { workspace = true, features = ["transport"] }
-prost.workspace = true
+
 chrono.workspace = true
-prost-types.workspace = true
+
 thiserror.workspace = true
 async-trait.workspace = true
 uuid.workspace = true
 tonic-prost.workspace = true
+prost-types.workspace = true
+prost.workspace = true
 serde_json = "1"
 serde = { version = "1", features = ["derive"] }
 toml = "0.9.8"
 # System info dependencies for ServerInfo service
-sysinfo = "0.29"
+sysinfo = { version = "0.37.2", features = ["network", "disk"] }
 if-addrs = "0.14.0"
 [dev-dependencies]
 tempfile = "3"

@@ -1,7 +1,7 @@
-use crate::proto::tasks::TasksService;
-use crate::proto::tasks_proto::tasks_server;
 use crate::proto::server_info::ServerInfoService;
 use crate::proto::server_info_proto::server_info_server;
+use crate::proto::tasks::TasksService;
+use crate::proto::tasks_proto::tasks_server;
 
 pub mod tasks;
 

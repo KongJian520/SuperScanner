@@ -1,7 +1,7 @@
 // ...existing code...
 use crate::proto::tasks_proto::{
-    CreateTaskRequest, DeleteTaskRequest, GetTaskRequest, ListTasksRequest, ListTasksResponse,
-    StartTaskRequest, StopTaskRequest, Task as ProtoTask, TaskStatus, tasks_server,
+    tasks_server, CreateTaskRequest, DeleteTaskRequest, GetTaskRequest, ListTasksRequest,
+    ListTasksResponse, StartTaskRequest, StopTaskRequest, Task as ProtoTask, TaskStatus,
 };
 use crate::services::task_runner::{BackgroundTaskRunner, TaskRunner};
 use crate::utils::ROOT_DIR;

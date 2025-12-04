@@ -8,13 +8,6 @@ service ServerInfo {
 }
 
 message ServerInfoRequest {
-  // 是否包含动态指标（memory/disk/network 等）。
-  bool include_metrics = 1;
-}
-
-message NetworkInterface {
-  string name = 1;
-  repeated string ip_addresses = 2;
 }
 
 message ServerInfoResponse {
@@ -29,5 +22,5 @@ message ServerInfoResponse {
   repeated double load_average = 8;
   uint64 disk_total_bytes = 9;
   uint64 disk_free_bytes = 10;
-  repeated NetworkInterface network_interfaces = 11;
+
 }
