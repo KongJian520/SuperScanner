@@ -20,7 +20,7 @@ impl ServerInfoService {
 impl server_info_server::ServerInfo for ServerInfoService {
     async fn get_info(
         &self,
-        req: Request<ServerInfoRequest>,
+        _req: Request<ServerInfoRequest>,
     ) -> Result<Response<ServerInfoResponse>, Status> {
         // ServerInfoRequest currently has no fields; ignore req
 

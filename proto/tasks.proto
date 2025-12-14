@@ -9,6 +9,7 @@ import "google/protobuf/empty.proto";
 
 // Tasks 服务定义了管理和执行 IP 扫描任务的接口
 service Tasks {
+  // ListTasks 获取所有任务的列表
   rpc ListTasks (ListTasksRequest) returns (ListTasksResponse);
 
   // CreateTask 创建一个新的扫描任务
@@ -30,6 +31,19 @@ service Tasks {
   // StopTask 停止正在运行的任务
   // 服务端应尝试终止扫描进程，并将状态更新为 STOPPED
   rpc StopTask (StopTaskRequest) returns (Task);
+
+  // 任务事件流
+  rpc StreamTaskEvents (StreamTaskEventsRequest) returns (stream TaskEvent);
+
+  // RestartTask: restart a completed task (same UUID). Only allowed when task is DONE.
+  // clear_logs: rotate/clear existing logs before restarting. start_now: if true, start task immediately after reset.
+  rpc RestartTask (RestartTaskRequest) returns (Task);
+}
+
+message RestartTaskRequest {
+  string id = 1;
+  bool clear_logs = 2;
+  bool start_now = 3;
 }
 
 // 任务实体对象，包含任务的所有元数据和状态
@@ -145,4 +159,39 @@ message StartTaskRequest {
 message StopTaskRequest {
   // 要停止的任务 ID
   string id = 1;
+}
+
+// Server-side streaming for task events (logs, progress, snapshot, errors)
+message StreamTaskEventsRequest {
+  string id = 1;
+  bool start_if_not_running = 2;
+  int64 start_offset = 3; // offset in main task.log to start replaying from;
+  repeated string subtask_filter = 4; // optional: only include these subtasks;
+}
+
+message TaskEvent {
+  oneof ev {
+    Progress progress = 1;
+    LogChunk log = 2;
+    Task task_snapshot = 3;
+    Error error = 4;
+  }
+}
+
+message Progress {
+  int32 percent = 1;
+  string message = 2;
+  google.protobuf.Timestamp ts = 3;
+}
+
+message LogChunk {
+  string subtask = 1;
+  string text = 2;
+  bool is_stderr = 3;
+  int64 offset = 4;
+  google.protobuf.Timestamp ts = 5;
+}
+
+message Error {
+  string message = 1;
 }

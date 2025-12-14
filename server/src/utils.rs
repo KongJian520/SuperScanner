@@ -6,7 +6,7 @@ use once_cell::sync::Lazy;
 use std::{env, path::PathBuf};
 
 pub static ROOT_DIR: Lazy<PathBuf> = Lazy::new(|| {
-    let base = if let Ok(env_dir) = env::var("SUPPERSCANNER_HOMEDIR") {
+    let base = if let Ok(env_dir) = env::var("SUPERSCANNER_HOMEDIR") {
         PathBuf::from(env_dir)
     } else {
         #[cfg(target_os = "windows")]
