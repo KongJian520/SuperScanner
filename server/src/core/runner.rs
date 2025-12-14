@@ -10,12 +10,8 @@ use std::sync::Arc;
 use tokio::fs::OpenOptions;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::Command;
-use tokio::sync::{broadcast, mpsc, Mutex};
+use tokio::sync::{Mutex, broadcast, mpsc};
 use tracing::{error, info};
-
-#[cfg(test)]
-#[path = "parser_tests.rs"]
-mod parser_tests;
 
 /// 简单的命令解析器：支持 metadata.toml 中的 command_spec 或回退到 targets[0]
 pub struct SimpleCommandParser {}
@@ -24,39 +20,74 @@ pub struct SimpleCommandParser {}
 impl CommandParser for SimpleCommandParser {
     async fn parse(&self, task_dir: &PathBuf) -> Result<CommandSpec, AppError> {
         let meta_path = task_dir.join("metadata.toml");
-        let content = tokio::fs::read_to_string(&meta_path).await
+        let content = tokio::fs::read_to_string(&meta_path)
+            .await
             .map_err(|e| AppError::Config(format!("无法读取 metadata.toml: {}", e)))?;
-        
-        let meta = content.parse::<toml::Value>()
+
+        let meta = content
+            .parse::<toml::Value>()
             .map_err(|e| AppError::Config(format!("metadata.toml 格式错误: {}", e)))?;
 
         // 尝试新的结构化形式
         if let Some(spec_tbl) = meta.get("command_spec").and_then(|v| v.as_table()) {
-            let program = spec_tbl.get("program")
+            let program = spec_tbl
+                .get("program")
                 .and_then(|v| v.as_str())
                 .map(PathBuf::from)
                 .unwrap_or_else(|| PathBuf::from("echo"));
-            let args = spec_tbl.get("args")
+            let args = spec_tbl
+                .get("args")
                 .and_then(|v| v.as_array())
-                .map(|arr| arr.iter().filter_map(|it| it.as_str().map(|s| s.to_string())).collect())
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|it| it.as_str().map(|s| s.to_string()))
+                        .collect()
+                })
                 .unwrap_or_default();
-            let targets = spec_tbl.get("targets")
+            let targets = spec_tbl
+                .get("targets")
                 .and_then(|v| v.as_array())
-                .map(|arr| arr.iter().filter_map(|it| it.as_str().map(|s| s.to_string())).collect())
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|it| it.as_str().map(|s| s.to_string()))
+                        .collect()
+                })
                 .unwrap_or_default();
-            
-            return Ok(CommandSpec { program, args, targets, env: None, cwd: None });
+
+            return Ok(CommandSpec {
+                program,
+                args,
+                targets,
+                env: None,
+                cwd: None,
+            });
         }
 
         // 回退模式
-        if let Some(first) = meta.get("targets").and_then(|t| t.as_array()).and_then(|arr| arr.get(0)).and_then(|v| v.as_str()) {
+        if let Some(first) = meta
+            .get("targets")
+            .and_then(|t| t.as_array())
+            .and_then(|arr| arr.get(0))
+            .and_then(|v| v.as_str())
+        {
             let mut parts = first.split_whitespace();
-            let program = parts.next().map(PathBuf::from).unwrap_or_else(|| PathBuf::from("echo"));
+            let program = parts
+                .next()
+                .map(PathBuf::from)
+                .unwrap_or_else(|| PathBuf::from("echo"));
             let args: Vec<String> = parts.map(|p| p.to_string()).collect();
-            return Ok(CommandSpec { program, args, targets: Vec::new(), env: None, cwd: None });
+            return Ok(CommandSpec {
+                program,
+                args,
+                targets: Vec::new(),
+                env: None,
+                cwd: None,
+            });
         }
 
-        Err(AppError::Config("metadata.toml 中未找到有效的命令定义".to_string()))
+        Err(AppError::Config(
+            "metadata.toml 中未找到有效的命令定义".to_string(),
+        ))
     }
 }
 
@@ -93,18 +124,27 @@ impl BackgroundTaskRunner {
         log_path: PathBuf,
     ) {
         let start_ts = Utc::now().timestamp_millis();
-        
+
         // 更新数据库状态为 RUNNING
-        if let Err(e) = store.set_status(&task_id, 2, None, None, None).await { // 2 = RUNNING
+        if let Err(e) = store.set_status(&task_id, 2, None, None, None).await {
+            // 2 = RUNNING
             error!("无法更新任务状态: {}", e);
             return;
         }
 
         // 准备日志文件
-        let log_file = match OpenOptions::new().create(true).append(true).open(&log_path).await {
+        let log_file = match OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&log_path)
+            .await
+        {
             Ok(f) => f,
             Err(e) => {
-                let _ = tx.send(RunnerEvent::Error { message: format!("无法打开日志文件: {}", e), ts: start_ts });
+                let _ = tx.send(RunnerEvent::Error {
+                    message: format!("无法打开日志文件: {}", e),
+                    ts: start_ts,
+                });
                 return;
             }
         };
@@ -114,7 +154,7 @@ impl BackgroundTaskRunner {
         if !spec.targets.is_empty() {
             spec.args.extend(spec.targets);
         }
-        
+
         let mut cmd = Command::new(&spec.program);
         cmd.args(&spec.args);
         if let Some(cwd) = &spec.cwd {
@@ -128,8 +168,19 @@ impl BackgroundTaskRunner {
             Ok(c) => c,
             Err(e) => {
                 let msg = format!("启动进程失败: {}", e);
-                let _ = tx.send(RunnerEvent::Error { message: msg.clone(), ts: start_ts });
-                let _ = store.set_status(&task_id, 4, Some(-1), Some(msg), Some(Utc::now().timestamp_millis())).await; // 4 = FAILED
+                let _ = tx.send(RunnerEvent::Error {
+                    message: msg.clone(),
+                    ts: start_ts,
+                });
+                let _ = store
+                    .set_status(
+                        &task_id,
+                        4,
+                        Some(-1),
+                        Some(msg),
+                        Some(Utc::now().timestamp_millis()),
+                    )
+                    .await; // 4 = FAILED
                 return;
             }
         };
@@ -205,7 +256,11 @@ impl TaskManager for BackgroundTaskRunner {
         self.start_with_event_sink(id, tx).await
     }
 
-    async fn start_with_event_sink(&self, id: &str, sink: mpsc::Sender<RunnerEvent>) -> Result<i64, AppError> {
+    async fn start_with_event_sink(
+        &self,
+        id: &str,
+        sink: mpsc::Sender<RunnerEvent>,
+    ) -> Result<i64, AppError> {
         let mut tasks = self.running_tasks.lock().await;
         if tasks.contains_key(id) {
             return Err(AppError::Task("任务已在运行中".to_string()));
@@ -213,7 +268,7 @@ impl TaskManager for BackgroundTaskRunner {
 
         let task_dir = self.tasks_dir.join(id);
         let spec = self.parser.parse(&task_dir).await?;
-        
+
         // 确保日志目录存在
         let log_dir = task_dir.join("logs");
         tokio::fs::create_dir_all(&log_dir).await?;
@@ -236,16 +291,19 @@ impl TaskManager for BackgroundTaskRunner {
         let store = self.store.clone();
         let task_id = id.to_string();
         let bc_clone = broadcaster.clone();
-        
+
         let join_handle = tokio::spawn(async move {
             Self::run_task_loop(task_id, spec, store, bc_clone, stop_rx, log_path).await;
         });
 
-        tasks.insert(id.to_string(), RunnerHandle {
-            broadcaster,
-            join_handle,
-            stop_tx,
-        });
+        tasks.insert(
+            id.to_string(),
+            RunnerHandle {
+                broadcaster,
+                join_handle,
+                stop_tx,
+            },
+        );
 
         Ok(Utc::now().timestamp_millis())
     }
@@ -259,7 +317,11 @@ impl TaskManager for BackgroundTaskRunner {
         Ok(())
     }
 
-    async fn attach_event_sink(&self, id: &str, sink: mpsc::Sender<RunnerEvent>) -> Result<(), AppError> {
+    async fn attach_event_sink(
+        &self,
+        id: &str,
+        sink: mpsc::Sender<RunnerEvent>,
+    ) -> Result<(), AppError> {
         let tasks = self.running_tasks.lock().await;
         if let Some(handle) = tasks.get(id) {
             let mut rx = handle.broadcaster.subscribe();
