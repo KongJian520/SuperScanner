@@ -1,5 +1,5 @@
 import {invoke} from '@tauri-apps/api/core';
-import type {BackendConfig, ServerInfo, Task} from '../types';
+import {BackendConfig, ServerInfo, Task, TaskStatus} from '../types';
 
 export type ApiResult<T> = { ok: true; data: T } | { ok: false, error: string };
 
@@ -60,6 +60,35 @@ export async function deleteTask(address: string, id: string, useTls?: boolean):
     }
 }
 
+export async function getTask(address: string, id: string, useTls?: boolean): Promise<ApiResult<Task>> {
+    try {
+        const raw = await invoke<any>('get_task', {address, id, use_tls: !!useTls});
+        // Map raw DTO to frontend Task shape (similar to listTasks logic)
+        const createdRaw = raw?.created_at ?? raw?.createdAt;
+        const startedRaw = raw?.started_at ?? raw?.startedAt;
+        const finishedRaw = raw?.finished_at ?? raw?.finishedAt;
+        
+        const task: Task = {
+            id: raw?.id ?? '',
+            name: raw?.name ?? '',
+            description: raw?.description ?? raw?.desc ?? '',
+            targets: raw?.targets ?? [],
+            status: (typeof raw?.status === 'number') ? raw.status : 0,
+            exitCode: raw?.exit_code ?? raw?.exitCode,
+            errorMessage: raw?.error_message ?? raw?.errorMessage,
+            createdAt: createdRaw ? Date.parse(createdRaw) : Date.now(),
+            updatedAt: undefined,
+            startedAt: startedRaw ? Date.parse(startedRaw) : undefined,
+            finishedAt: finishedRaw ? Date.parse(finishedRaw) : undefined,
+            progress: raw?.progress ?? 0,
+            logs: [],
+        };
+        return {ok: true, data: task};
+    } catch (e) {
+        return {ok: false, error: textErr(e)};
+    }
+}
+
 export async function createScanTask(address: string, input: {
     name: string;
     description?: string;
@@ -103,19 +132,26 @@ export async function listTasks(address: string, useTls?: boolean): Promise<ApiR
             const createdAt = createdRaw ? Date.parse(createdRaw) : Date.now();
             const startedAt = startedRaw ? Date.parse(startedRaw) : undefined;
             const finishedAt = finishedRaw ? Date.parse(finishedRaw) : undefined;
+            const status = (typeof d?.status === 'number') ? d.status : 0;
+            // Use persisted progress from server if available, otherwise fallback to status-based logic
+            let progress = d?.progress ?? 0;
+            if (status === TaskStatus.DONE) {
+                progress = 100;
+            }
+            
             return {
                 id: d?.id ?? '',
                 name: d?.name ?? '',
                 description: d?.description ?? d?.desc ?? '',
                 targets: d?.targets ?? [],
-                status: (typeof d?.status === 'number') ? d.status : 0,
+                status: status,
                 exitCode: d?.exit_code ?? d?.exitCode ?? undefined,
                 errorMessage: d?.error_message ?? d?.errorMessage ?? undefined,
                 createdAt: createdAt,
                 updatedAt: undefined,
                 startedAt: startedAt,
                 finishedAt: finishedAt,
-                progress: 0,
+                progress: progress,
                 logs: [],
             } as Task;
         });
@@ -125,9 +161,9 @@ export async function listTasks(address: string, useTls?: boolean): Promise<ApiR
     }
 }
 
-export async function getServerInfo(address: string): Promise<ApiResult<ServerInfo>> {
+export async function getServerInfo(address: string, useTls?: boolean): Promise<ApiResult<ServerInfo>> {
     try {
-        const raw = await invoke<any>('get_server_info', {address});
+        const raw = await invoke<any>('get_server_info', {address, use_tls: !!useTls});
         const info = normalizeServerInfoDto(raw);
         return {ok: true, data: info};
     } catch (e) {
@@ -187,34 +223,13 @@ export async function restartScan(address: string, id: string, useTls?: boolean)
     }
 }
 
-export async function getTask(address: string, id: string, useTls?: boolean): Promise<ApiResult<Task>> {
+
+export async function streamTaskEvents(address: string, id: string, useTls?: boolean): Promise<ApiResult<null>> {
     try {
-        const raw = await invoke<any>('get_task', { address, id, use_tls: !!useTls });
-        if (!raw) return { ok: false, error: 'task not found' };
-        const createdRaw = raw?.created_at ?? raw?.createdAt ?? raw?.createdAt;
-        const startedRaw = raw?.started_at ?? raw?.startedAt;
-        const finishedRaw = raw?.finished_at ?? raw?.finishedAt;
-        const createdAt = createdRaw ? Date.parse(createdRaw) : Date.now();
-        const startedAt = startedRaw ? Date.parse(startedRaw) : undefined;
-        const finishedAt = finishedRaw ? Date.parse(finishedRaw) : undefined;
-        const task: Task = {
-            id: raw?.id ?? '',
-            name: raw?.name ?? '',
-            description: raw?.description ?? raw?.desc ?? '',
-            targets: raw?.targets ?? [],
-            status: (typeof raw?.status === 'number') ? raw.status : 0,
-            exitCode: raw?.exit_code ?? raw?.exitCode ?? undefined,
-            errorMessage: raw?.error_message ?? raw?.errorMessage ?? undefined,
-            createdAt: createdAt,
-            updatedAt: undefined,
-            startedAt: startedAt,
-            finishedAt: finishedAt,
-            progress: 0,
-            logs: [],
-        };
-        return { ok: true, data: task };
+        await invoke('stream_task_events', {address, id, use_tls: !!useTls});
+        return {ok: true, data: null};
     } catch (e) {
-        return { ok: false, error: textErr(e) };
+        return {ok: false, error: textErr(e)};
     }
 }
 
@@ -230,4 +245,5 @@ export default {
     getTask,
     listTasks,
     getServerInfo,
+    streamTaskEvents,
 };

@@ -18,9 +18,11 @@ export interface ScanTarget {
 }
 
 export interface LogEntry {
-  timestamp: string;
+  id?: string;
+  timestamp: number;
   level: 'info' | 'warn' | 'error' | 'success';
   message: string;
+  source?: string;
 }
 
 export interface Task {

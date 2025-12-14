@@ -1,7 +1,7 @@
 import React from 'react';
 import { useParams, Navigate } from 'react-router-dom';
 import { TaskDetail } from '@/views/TaskDetail';
-import { useTasks, useBackends } from '../hooks/use-scanner-api';
+import { useTasks, useBackends, useTaskEvents } from '../hooks/use-scanner-api';
 import { useAppStore } from '../lib/store';
 
 export const TaskDetailRoute: React.FC = () => {
@@ -11,6 +11,9 @@ export const TaskDetailRoute: React.FC = () => {
   
   const effectiveBackendId = activeBackendId ?? backends?.find(b => b.address)?.id ?? null;
   const { data: tasks } = useTasks(effectiveBackendId);
+  
+  // Enable real-time updates for this task
+  useTaskEvents(effectiveBackendId, id ?? null);
   
   const task = tasks?.find(t => t.id === id);
 

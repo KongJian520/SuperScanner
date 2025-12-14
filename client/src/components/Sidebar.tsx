@@ -14,13 +14,22 @@ import {
     Trash2
 } from 'lucide-react';
 import { TaskStatus } from '../types';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useMatch } from 'react-router-dom';
 import { useAppStore } from '../lib/store';
-import { useBackends, useTasks, useDeleteBackend, useDeleteTask } from '../hooks/use-scanner-api';
+import { useBackends, useTasks, useDeleteBackend, useDeleteTask, useTaskEvents } from '../hooks/use-scanner-api';
+
+// Component to subscribe to task events without rendering anything
+const TaskEventListener: React.FC<{ backendId: string | null, taskId: string }> = ({ backendId, taskId }) => {
+    useTaskEvents(backendId, taskId);
+    return null;
+};
 
 export const Sidebar: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const matchTask = useMatch('/task/:id');
+  const focusedTaskId = matchTask?.params.id;
+
   const { isSidebarOpen, activeBackendId, activeTaskId, setActiveTaskId, setActiveBackendId } = useAppStore();
   
   const { data: backends = [] } = useBackends();
@@ -244,6 +253,20 @@ export const Sidebar: React.FC = () => {
           {isSidebarOpen && <span className="text-sm font-medium">Settings</span>}
         </button>
       </div>
+
+      {/* Background Event Listeners for Running/Pending Tasks */}
+      {tasks.map(task => {
+          // Only listen if:
+          // 1. Task is running or pending
+          // 2. Task is NOT the currently focused task (TaskDetailRoute handles that)
+          const isActive = task.status === TaskStatus.RUNNING || task.status === TaskStatus.PENDING;
+          const isFocused = task.id === focusedTaskId;
+          
+          if (isActive && !isFocused) {
+              return <TaskEventListener key={task.id} backendId={effectiveBackendId} taskId={task.id} />;
+          }
+          return null;
+      })}
     </div>
   );
 };

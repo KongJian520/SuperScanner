@@ -10,6 +10,8 @@ pub struct TaskMetadata {
     pub description: String,
     pub targets: Vec<String>,
     pub status: i32,
+    #[serde(default)]
+    pub progress: u8,
     pub exit_code: i32,
     pub error_message: String,
     pub created_at: i64,
@@ -27,6 +29,7 @@ pub struct TaskMetadataPatch {
     pub description: Option<String>,
     pub targets: Option<Vec<String>>,
     pub status: Option<i32>,
+    pub progress: Option<u8>,
     pub exit_code: Option<i32>,
     pub error_message: Option<String>,
     pub updated_at: Option<i64>,

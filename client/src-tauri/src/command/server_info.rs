@@ -6,18 +6,20 @@ use crate::utils::{config, convert, dto};
 use tracing::info;
 use crate::command::server_info_proto::ServerInfoRequest;
 use crate::utils::grpc::server_info_client;
+use crate::error::Result;
+use anyhow::Context;
 
 #[tauri::command]
 pub async fn probe_server_info(
     address: String,
     use_tls: bool,
-) -> Result<dto::ServerInfoDto, String> {
+) -> Result<dto::ServerInfoDto> {
     info!(%address, use_tls, "probe_server_info called");
     let mut client = server_info_client(&address, use_tls)
         .await
-        .map_err(|e| e.to_string())?;
+        .context("Failed to connect to server")?;
     let req = tonic::Request::new(ServerInfoRequest {});
-    let resp = client.get_info(req).await.map_err(|e| e.to_string())?;
+    let resp = client.get_info(req).await.context("Failed to get server info")?;
     let info = resp.into_inner();
     info!(%address, "probe_server_info succeeded");
     Ok(convert::server_info_from_proto(info))
@@ -29,7 +31,7 @@ pub async fn probe_server_info(
 pub async fn get_server_info(
     address: String,
     use_tls: Option<bool>,
-) -> Result<dto::ServerInfoDto, String> {
+) -> Result<dto::ServerInfoDto> {
     let use_tls = use_tls.unwrap_or(false);
     info!(%address, use_tls, "get_server_info wrapper called");
     probe_server_info(address, use_tls).await
@@ -41,7 +43,7 @@ pub async fn add_backend_with_probe(
     address: String,
     description: Option<String>,
     use_tls: Option<bool>,
-) -> Result<(), String> {
+) -> Result<()> {
     // try probing first
     let use_tls = use_tls.unwrap_or(false);
     info!(%name, %address, use_tls, "add_backend_with_probe called");
@@ -56,25 +58,25 @@ pub async fn add_backend_with_probe(
         created_at: chrono::Utc::now().timestamp_millis(),
     })
     .await
-    .map_err(|e| e.to_string())?;
+    .context("Failed to save backend record")?;
     info!("add_backend_with_probe completed and backend saved");
     Ok(())
 }
 
 #[tauri::command]
-pub async fn get_backends() -> Result<Vec<config::BackendRecord>, String> {
+pub async fn get_backends() -> Result<Vec<config::BackendRecord>> {
     info!("get_backends called");
-    let v = config::load_backends().await.map_err(|e| e.to_string())?;
+    let v = config::load_backends().await.context("Failed to load backends")?;
     info!(count = v.len(), "get_backends completed");
     Ok(v)
 }
 
 #[tauri::command]
-pub async fn delete_backend(identifier: String) -> Result<(), String> {
+pub async fn delete_backend(identifier: String) -> Result<()> {
     info!(%identifier, "delete_backend called");
     config::delete_backend(&identifier)
         .await
-        .map_err(|e| e.to_string())?;
+        .context("Failed to delete backend")?;
     info!(%identifier, "delete_backend completed");
     Ok(())
 }

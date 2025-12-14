@@ -30,6 +30,7 @@ pub struct TaskDto {
     pub description: Option<String>,
     pub targets: Option<Vec<String>>,
     pub status: i32,
+    pub progress: i32,
     pub created_at: Option<String>,
     pub started_at: Option<String>,
     pub finished_at: Option<String>,
@@ -41,4 +42,34 @@ pub struct CreateTaskDto {
     pub name: String,
     pub description: Option<String>,
     pub targets: Option<Vec<String>>,
+}
+
+#[derive(Serialize, Debug, Clone)]
+#[serde(tag = "type", content = "payload")]
+pub enum TaskEventDto {
+    Progress(ProgressDto),
+    Log(LogChunkDto),
+    TaskSnapshot(TaskDto),
+    Error(ErrorDto),
+}
+
+#[derive(Serialize, Debug, Clone)]
+pub struct ProgressDto {
+    pub percent: i32,
+    pub message: String,
+    pub ts: Option<String>,
+}
+
+#[derive(Serialize, Debug, Clone)]
+pub struct LogChunkDto {
+    pub subtask: String,
+    pub text: String,
+    pub is_stderr: bool,
+    pub offset: i64,
+    pub ts: Option<String>,
+}
+
+#[derive(Serialize, Debug, Clone)]
+pub struct ErrorDto {
+    pub message: String,
 }

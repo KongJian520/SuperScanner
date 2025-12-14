@@ -1,6 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useEffect } from 'react';
+import { listen } from '@tauri-apps/api/event';
 import * as api from '../lib/api';
-import { BackendConfig, Task } from '../types';
+import { Task, LogEntry, TaskStatus } from '../types';
 import { toast } from 'sonner';
 
 // --- Backends ---
@@ -57,6 +59,7 @@ export function useDeleteBackend() {
 export function useTasks(backendId: string | null) {
   const { data: backends } = useBackends();
   const backend = backends?.find((b) => b.id === backendId);
+  const queryClient = useQueryClient();
 
   return useQuery({
     queryKey: ['tasks', backendId],
@@ -64,13 +67,120 @@ export function useTasks(backendId: string | null) {
       if (!backend?.address) throw new Error('Backend address not found');
       const res = await api.listTasks(backend.address, !!backend.useTls);
       if (!res.ok) throw new Error(res.error);
-      // Attach backendId to tasks for context
-      return res.data.map(t => ({ ...t, backendId: backend.id }));
+      
+      const newTasks = res.data.map(t => ({ ...t, backendId: backend.id }));
+      
+      // Smart Merge: Preserve local state (logs, progress) that might be newer than DB
+      const oldTasks = queryClient.getQueryData<Task[]>(['tasks', backendId]);
+      if (!oldTasks) return newTasks;
+
+      return newTasks.map(nt => {
+          const ot = oldTasks.find(t => t.id === nt.id);
+          if (!ot) return nt;
+
+          // If task is running/pending, preserve progress if local is ahead
+          // Also preserve logs since listTasks returns empty logs
+          if (nt.status === TaskStatus.RUNNING || nt.status === TaskStatus.PENDING) {
+              return {
+                  ...nt,
+                  progress: Math.max(nt.progress, ot.progress),
+                  logs: (ot.logs?.length ?? 0) > (nt.logs?.length ?? 0) ? ot.logs : nt.logs,
+              };
+          }
+          // Even if done, we might want to keep logs if listTasks doesn't return them
+          if (nt.status === TaskStatus.DONE || nt.status === TaskStatus.FAILED || nt.status === TaskStatus.STOPPED) {
+               return {
+                   ...nt,
+                   logs: (ot.logs?.length ?? 0) > (nt.logs?.length ?? 0) ? ot.logs : nt.logs,
+               };
+          }
+          
+          return nt;
+      });
     },
     enabled: !!backend?.address,
     staleTime: 5000, // Cache for 5 seconds
     refetchInterval: 10000, // Auto-refresh every 10s
   });
+}
+
+export function useTaskEvents(backendId: string | null, taskId: string | null) {
+    const { data: backends } = useBackends();
+    const backend = backends?.find((b) => b.id === backendId);
+    const queryClient = useQueryClient();
+
+    useEffect(() => {
+        if (!backend?.address || !taskId) return;
+
+        let unlisten: (() => void) | undefined;
+
+        const startListening = async () => {
+            // Start the stream on the backend
+            if (backend?.address) {
+                await api.streamTaskEvents(backend.address, taskId, !!backend.useTls);
+            }
+
+            // Listen for events
+            unlisten = await listen(`task-event://${taskId}`, (event: any) => {
+                const payload = event.payload;
+                
+                queryClient.setQueryData(['tasks', backendId], (oldTasks: Task[] | undefined) => {
+                    if (!oldTasks) return oldTasks;
+                    return oldTasks.map(t => {
+                        if (t.id !== taskId) return t;
+                        
+                        // Update task based on event type
+                        if (payload.type === 'Progress') {
+                            return { ...t, progress: payload.payload.percent };
+                        } else if (payload.type === 'Log') {
+                            const logEntry: LogEntry = {
+                                id: Date.now().toString() + Math.random(), // simple unique id
+                                timestamp: payload.payload.ts ? Date.parse(payload.payload.ts) : Date.now(),
+                                level: payload.payload.is_stderr ? 'error' : 'info',
+                                message: payload.payload.text,
+                                source: payload.payload.subtask
+                            };
+                            return { ...t, logs: [...(t.logs || []), logEntry] };
+                        } else if (payload.type === 'TaskSnapshot') {
+                            // Merge snapshot data
+                            const snap = payload.payload;
+                            
+                            // Calculate new progress
+                            // Use snapshot progress if available, but prefer local progress if snapshot is stale (0) while running
+                            let newProgress = snap.progress ?? t.progress;
+                            if (snap.status === TaskStatus.RUNNING && newProgress === 0 && t.progress > 0) {
+                                newProgress = t.progress;
+                            }
+                            
+                            if (snap.status === TaskStatus.DONE) {
+                                newProgress = 100;
+                            } else if (snap.status === TaskStatus.PENDING) {
+                                newProgress = 0;
+                            }
+
+                            const parseTs = (ts: any) => typeof ts === 'string' ? Date.parse(ts) : (typeof ts === 'number' ? ts : undefined);
+
+                            return {
+                                ...t,
+                                ...snap, // Update basic fields
+                                status: snap.status,
+                                progress: newProgress,
+                                startedAt: snap.started_at ? parseTs(snap.started_at) : t.startedAt,
+                                finishedAt: snap.finished_at ? parseTs(snap.finished_at) : t.finishedAt,
+                            };
+                        }
+                        return t;
+                    });
+                });
+            });
+        };
+
+        startListening();
+
+        return () => {
+            if (unlisten) unlisten();
+        };
+    }, [backend?.address, backend?.useTls, taskId, queryClient, backendId]);
 }
 
 export function useTaskDetail(backendId: string | null, taskId: string | null) {
@@ -95,14 +205,10 @@ export function useTaskDetail(backendId: string | null, taskId: string | null) {
         queryKey: ['task', backendId, taskId],
         queryFn: async () => {
              if (!backend?.address || !taskId) throw new Error('Invalid context');
-             // If there is no specific getTask, we might have to list all. 
-             // Ideally we should add `getTask` to api.ts if it exists in Rust.
-             // For now, let's reuse listTasks and find.
-             const res = await api.listTasks(backend.address, !!backend.useTls);
+             
+             const res = await api.getTask(backend.address, taskId, !!backend.useTls);
              if (!res.ok) throw new Error(res.error);
-             const task = res.data.find(t => t.id === taskId);
-             if (!task) throw new Error('Task not found');
-             return { ...task, backendId: backend.id };
+             return { ...res.data, backendId: backend.id };
         },
         enabled: !!backend?.address && !!taskId,
         refetchInterval: 2000, // Faster refresh for details (logs)
@@ -131,7 +237,12 @@ export function useCreateTask() {
       if (!res.ok) throw new Error(res.error);
       return { ...res.data, backendId: backend.id };
     },
-    onSuccess: (data, variables) => {
+    onSuccess: (_data, variables) => {
+      // Optimistically update the cache to include the new task immediately
+      queryClient.setQueryData(['tasks', variables.backendId], (oldTasks: Task[] | undefined) => {
+          if (!oldTasks) return [_data];
+          return [...oldTasks, _data];
+      });
       queryClient.invalidateQueries({ queryKey: ['tasks', variables.backendId] });
       toast.success('任务创建成功');
     },
@@ -177,6 +288,11 @@ export function useStartTask() {
       return res.data;
     },
     onSuccess: (_, variables) => {
+      // Optimistically update status to RUNNING
+      queryClient.setQueryData(['tasks', variables.backendId], (oldTasks: Task[] | undefined) => {
+          if (!oldTasks) return oldTasks;
+          return oldTasks.map(t => t.id === variables.taskId ? { ...t, status: TaskStatus.RUNNING } : t);
+      });
       queryClient.invalidateQueries({ queryKey: ['tasks', variables.backendId] });
       toast.success('任务已启动');
     },
@@ -212,7 +328,7 @@ export function useServerInfo(backendId: string | null) {
     queryKey: ['serverInfo', backendId],
     queryFn: async () => {
       if (!backend?.address) throw new Error('Backend not found');
-      const res = await api.getServerInfo(backend.address);
+      const res = await api.getServerInfo(backend.address, !!backend.useTls);
       if (!res.ok) throw new Error(res.error);
       return res.data;
     },

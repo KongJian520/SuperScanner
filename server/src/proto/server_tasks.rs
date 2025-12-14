@@ -55,6 +55,7 @@ impl TasksService {
             updated_at: Self::to_proto_ts(meta.updated_at),
             started_at: Self::to_proto_ts(meta.started_at),
             finished_at: Self::to_proto_ts(meta.finished_at),
+            progress: meta.progress as i32,
         }
     }
 }
@@ -117,6 +118,7 @@ impl tasks_server::Tasks for TasksService {
             started_at: None,
             finished_at: None,
             log_path: String::new(),
+            progress: 0,
         };
 
         self.store.create_task(&meta).await.map_err(Status::from)?;

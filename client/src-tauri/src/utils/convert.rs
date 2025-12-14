@@ -44,8 +44,31 @@ pub fn task_from_proto(p: tasks_proto::Task) -> TaskDto {
         },
         targets: if p.targets.is_empty() { None } else { Some(p.targets) },
         status: p.status,
+        progress: p.progress,
         created_at: ts_to_rfc3339(p.created_at),
         started_at: ts_to_rfc3339(p.started_at),
         finished_at: ts_to_rfc3339(p.finished_at),
+    }
+}
+
+pub fn task_event_from_proto(p: tasks_proto::TaskEvent) -> Option<TaskEventDto> {
+    match p.ev {
+        Some(tasks_proto::task_event::Ev::Progress(p)) => Some(TaskEventDto::Progress(ProgressDto {
+            percent: p.percent,
+            message: p.message,
+            ts: ts_to_rfc3339(p.ts),
+        })),
+        Some(tasks_proto::task_event::Ev::Log(l)) => Some(TaskEventDto::Log(LogChunkDto {
+            subtask: l.subtask,
+            text: l.text,
+            is_stderr: l.is_stderr,
+            offset: l.offset,
+            ts: ts_to_rfc3339(l.ts),
+        })),
+        Some(tasks_proto::task_event::Ev::TaskSnapshot(t)) => Some(TaskEventDto::TaskSnapshot(task_from_proto(t))),
+        Some(tasks_proto::task_event::Ev::Error(e)) => Some(TaskEventDto::Error(ErrorDto {
+            message: e.message,
+        })),
+        None => None,
     }
 }

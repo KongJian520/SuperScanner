@@ -13,7 +13,7 @@ pub trait TaskStore: Send + Sync + 'static {
     #[allow(dead_code)]
     async fn update_task(&self, id: &str, patch: &TaskMetadataPatch) -> Result<(), AppError>;
     async fn delete_task(&self, id: &str) -> Result<(), AppError>;
-    async fn set_status(&self, id: &str, status: i32, exit_code: Option<i32>, error: Option<String>, finished_at: Option<i64>) -> Result<(), AppError>;
+    async fn set_status(&self, id: &str, status: i32, progress: Option<u8>, exit_code: Option<i32>, error: Option<String>, finished_at: Option<i64>) -> Result<(), AppError>;
     async fn reset_task_for_restart(&self, id: &str, now_ms: i64) -> Result<TaskMetadata, AppError>;
 }
 

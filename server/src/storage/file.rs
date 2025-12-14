@@ -131,9 +131,10 @@ impl TaskStore for FileTaskStore {
         Ok(())
     }
 
-    async fn set_status(&self, id: &str, status: i32, exit_code: Option<i32>, error: Option<String>, finished_at: Option<i64>) -> Result<(), AppError> {
+    async fn set_status(&self, id: &str, status: i32, progress: Option<u8>, exit_code: Option<i32>, error: Option<String>, finished_at: Option<i64>) -> Result<(), AppError> {
         let patch = TaskMetadataPatch {
             status: Some(status),
+            progress: Some(progress.unwrap_or(0)),
             exit_code,
             error_message: error,
             finished_at,

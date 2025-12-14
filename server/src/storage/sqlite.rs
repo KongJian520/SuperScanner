@@ -41,7 +41,7 @@ impl SqliteTaskStore {
 #[async_trait]
 impl TaskStore for SqliteTaskStore {
     async fn list_tasks(&self) -> Result<Vec<TaskMetadata>, AppError> {
-        let rows = sqlx::query("SELECT id,name,description,targets,status,exit_code,error_message,created_at,updated_at,started_at,finished_at,log_path FROM tasks ORDER BY created_at DESC")
+        let rows = sqlx::query("SELECT id,name,description,targets,status,progress,exit_code,error_message,created_at,updated_at,started_at,finished_at,log_path FROM tasks ORDER BY created_at DESC")
             .fetch_all(&self.pool)
             .await?;
 
@@ -63,6 +63,7 @@ impl TaskStore for SqliteTaskStore {
                 description: row.get::<Option<String>, _>("description").unwrap_or_default(),
                 targets,
                 status: row.get("status"),
+                progress: row.get::<Option<i32>, _>("progress").unwrap_or(0) as u8,
                 exit_code: row.get::<Option<i32>, _>("exit_code").unwrap_or(0),
                 error_message: row.get::<Option<String>, _>("error_message").unwrap_or_default(),
                 created_at: row.get("created_at"),
@@ -93,6 +94,7 @@ impl TaskStore for SqliteTaskStore {
                 description: row.get::<Option<String>, _>("description").unwrap_or_default(),
                 targets,
                 status: row.get("status"),
+                progress: row.get::<Option<i32>, _>("progress").unwrap_or(0) as u8,
                 exit_code: row.get::<Option<i32>, _>("exit_code").unwrap_or(0),
                 error_message: row.get::<Option<String>, _>("error_message").unwrap_or_default(),
                 created_at: row.get("created_at"),
@@ -131,6 +133,9 @@ impl TaskStore for SqliteTaskStore {
         if let Some(name) = &patch.name {
             sqlx::query("UPDATE tasks SET name = ? WHERE id = ?").bind(name).bind(id).execute(&self.pool).await?;
         }
+        if let Some(progress) = patch.progress {
+            sqlx::query("UPDATE tasks SET progress = ? WHERE id = ?").bind(progress as i32).bind(id).execute(&self.pool).await?;
+        }
         // ... 其他字段更新逻辑 (略，为节省篇幅，请按需补充)
         Ok(())
     }
@@ -140,15 +145,24 @@ impl TaskStore for SqliteTaskStore {
         Ok(())
     }
 
-    async fn set_status(&self, id: &str, status: i32, exit_code: Option<i32>, error: Option<String>, finished_at: Option<i64>) -> Result<(), AppError> {
-        sqlx::query("UPDATE tasks SET status = ?, exit_code = ?, error_message = ?, finished_at = ? WHERE id = ?")
+    async fn set_status(&self, id: &str, status: i32, progress: Option<u8>, exit_code: Option<i32>, error: Option<String>, finished_at: Option<i64>) -> Result<(), AppError> {
+        let mut sql = "UPDATE tasks SET status = ?, exit_code = ?, error_message = ?, finished_at = ?".to_string();
+        if progress.is_some() {
+            sql.push_str(", progress = ?");
+        }
+        sql.push_str(" WHERE id = ?");
+
+        let mut query = sqlx::query(&sql)
             .bind(status)
             .bind(exit_code)
             .bind(error)
-            .bind(finished_at)
-            .bind(id)
-            .execute(&self.pool)
-            .await?;
+            .bind(finished_at);
+        
+        if let Some(p) = progress {
+            query = query.bind(p as i32);
+        }
+        
+        query.bind(id).execute(&self.pool).await?;
         Ok(())
     }
 

@@ -2,6 +2,7 @@ use crate::command::{server_info, tasks};
 
 mod command;
 mod utils;
+mod error;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -30,6 +31,7 @@ pub fn run() {
             tasks::start_task,
             tasks::stop_task,
             tasks::delete_task,
+            tasks::stream_task_events,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

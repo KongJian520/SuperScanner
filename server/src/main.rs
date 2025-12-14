@@ -1,6 +1,6 @@
 use crate::config::AppConfig;
 use crate::core::traits::TaskStore;
-use crate::core::command::{CommandRegistry, PingCommand, CurlCommand};
+use crate::core::command::{CommandRegistry, PingCommand};
 use crate::proto::{server_info_svc, tasks_svc_with_store};
 use crate::storage::file::FileTaskStore;
 use crate::utils::logging;
@@ -58,7 +58,6 @@ async fn main() -> anyhow::Result<()> {
     // 初始化命令注册表
     let registry = CommandRegistry::new()
         .register(PingCommand);
-        //.register(CurlCommand);
     info!("已加载命令: {:?}", registry.list_commands());
 
     server_builder
