@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package server.v1;
+package status.v1;
 
 // ServerInfo 服务：查询服务器信息（主机名、OS、uptime、资源信息等）。
 service ServerInfo {

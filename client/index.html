@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en" class="dark">
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PolyScan — Tauri App</title>
+  <!-- Tailwind is loaded via local build (App.css + postcss) -->
+  <!-- removed hardcoded dev script -->
+  <style>
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #27272a;
+      border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: #3f3f46;
+    }
+
+    body {
+      background-color: #09090b;
+      color: #fafafa;
+      overflow: hidden;
+      /* App-like feel */
+    }
+
+    /* Binary Stream Animation */
+    @keyframes binary-slide {
+      0% {
+        transform: translateX(-10%);
+      }
+
+      100% {
+        transform: translateX(50%);
+      }
+    }
+
+    .mask-gradient-right {
+      mask-image: linear-gradient(to right, rgba(0, 0, 0, 1) 20%, rgba(0, 0, 0, 0) 100%);
+      -webkit-mask-image: linear-gradient(to right, rgba(0, 0, 0, 1) 20%, rgba(0, 0, 0, 0) 100%);
+    }
+  </style>
+</head>
+
+<body>
+  <div id="root"></div>
+  <script type="module" src="/src/main.tsx"></script>
+</body>
+
+</html>

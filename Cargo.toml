@@ -1,5 +1,5 @@
 [workspace]
-members = ["client/src-tauri", "server"]
+members = ["server","client/src-tauri"]
 resolver = "3"
 
 
@@ -32,7 +32,7 @@ rustls = "0.23.35"
 prost = "0.14.1"
 prost-types = "0.14.1"
 # tonic + prost integration crates
-tonic = { version = "0.14.2", features = ["transport","tls-ring"] }
+tonic = { version = "0.14.2", features = ["transport", "tls-ring"] }
 tonic-prost = "0.14.2"
 # build-time helpers for generating protobuf/tonic code
 tonic-prost-build = "0.14.2"

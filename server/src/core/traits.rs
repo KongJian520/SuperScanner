@@ -19,7 +19,7 @@ pub trait TaskStore: Send + Sync + 'static {
 
 #[async_trait]
 pub trait CommandParser: Send + Sync + 'static {
-    async fn parse(&self, task_dir: &PathBuf) -> Result<CommandSpec, AppError>;
+    async fn parse(&self, task_dir: &PathBuf) -> Result<Vec<CommandSpec>, AppError>;
 }
 
 #[async_trait]

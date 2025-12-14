@@ -4,3 +4,5 @@ pub use crate::core::traits::TaskStore;
 pub use crate::core::types::{TaskMetadata, TaskMetadataPatch};
 
 pub mod sqlite;
+pub mod file;
+

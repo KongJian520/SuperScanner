@@ -1,7 +1,8 @@
 use crate::config::AppConfig;
 use crate::core::traits::TaskStore;
+use crate::core::command::{CommandRegistry, PingCommand, CurlCommand};
 use crate::proto::{server_info_svc, tasks_svc_with_store};
-use crate::storage::sqlite::SqliteTaskStore;
+use crate::storage::file::FileTaskStore;
 use crate::utils::logging;
 use crate::utils::signal::wait_for_double_ctrl_c;
 use anyhow::Context;
@@ -46,14 +47,22 @@ async fn main() -> anyhow::Result<()> {
         info!("服务器启动 (无 TLS) 于 {}", addr);
     }
 
-    // 初始化数据库 (包含自动迁移)
-    let store = SqliteTaskStore::new(&config.db_path)
-        .await
-        .context("无法初始化任务存储")?;
+    // 初始化文件存储
+    let tasks_dir = config.root_dir.join("tasks");
+    if !tasks_dir.exists() {
+        tokio::fs::create_dir_all(&tasks_dir).await.context("无法创建任务目录")?;
+    }
+    let store = FileTaskStore::new(tasks_dir);
     let store = Arc::new(store) as Arc<dyn TaskStore>;
 
+    // 初始化命令注册表
+    let registry = CommandRegistry::new()
+        .register(PingCommand);
+        //.register(CurlCommand);
+    info!("已加载命令: {:?}", registry.list_commands());
+
     server_builder
-        .add_service(tasks_svc_with_store(store))
+        .add_service(tasks_svc_with_store(store, registry))
         .add_service(server_info_svc())
         .serve_with_shutdown(addr, wait_for_double_ctrl_c())
         .await

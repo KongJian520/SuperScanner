@@ -36,8 +36,9 @@ pub struct TaskMetadataPatch {
 }
 
 /// 命令执行规范
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CommandSpec {
+    pub id: String,
     pub program: PathBuf,
     pub targets: Vec<String>,
     pub args: Vec<String>,

@@ -15,6 +15,8 @@ pub enum AppError {
     Tls(String),
     #[error("序列化错误: {0}")]
     Serialization(String),
+    #[error("存储错误: {0}")]
+    Storage(String),
     #[error("未知错误: {0}")]
     Unknown(#[from] anyhow::Error),
 }

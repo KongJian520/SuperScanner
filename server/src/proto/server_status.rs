@@ -6,7 +6,7 @@ use tonic::{Request, Response, Status};
 use sysinfo::Disks;
 
 // 假设这些路径和结构体在您的项目中是正确的
-use crate::proto::server_info_proto::{server_info_server, ServerInfoRequest, ServerInfoResponse};
+use crate::proto::status_proto::{server_info_server, ServerInfoRequest, ServerInfoResponse};
 
 pub struct ServerInfoService;
 
