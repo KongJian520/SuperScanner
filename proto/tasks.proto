@@ -89,6 +89,22 @@ message Task {
 
   // 任务进度 (0-100)
   int32 progress = 12;
+
+  // 任务工作流定义
+  Workflow workflow = 13;
+
+  // 扫描结果列表
+  repeated ScanResult results = 14;
+}
+
+message ScanResult {
+  string ip = 1;
+  int32 port = 2;
+  string protocol = 3;
+  string state = 4;
+  string service = 5;
+  string tool = 6;
+  string timestamp = 7;
 }
 
 // 任务状态枚举
@@ -115,6 +131,22 @@ enum TaskStatus {
   PAUSED = 6;  
 }
 
+enum ScanType {
+  SCAN_TYPE_UNSPECIFIED = 0;
+  SCAN_TYPE_PORT = 1;
+  SCAN_TYPE_FINGERPRINT = 2;
+  SCAN_TYPE_POC = 3;
+}
+
+message WorkflowStep {
+  ScanType type = 1;
+  string tool = 2;
+}
+
+message Workflow {
+  repeated WorkflowStep steps = 1;
+}
+
 // 获取任务列表请求
 message ListTasksRequest {
 
@@ -138,6 +170,9 @@ message CreateTaskRequest {
   // 扫描目标列表 (必填)
   // 支持 IP 或 CIDR 格式
   repeated string targets = 3;
+
+  // 任务工作流定义
+  Workflow workflow = 4;
 }
 
 // 删除任务请求

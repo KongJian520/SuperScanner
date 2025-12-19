@@ -32,6 +32,18 @@ fn ts_to_rfc3339(ts: Option<Timestamp>) -> Option<String> {
     })
 }
 
+fn workflow_from_proto(wf: Option<tasks_proto::Workflow>) -> WorkflowDto {
+    match wf {
+        Some(w) => WorkflowDto {
+            steps: w.steps.into_iter().map(|s| WorkflowStepDto {
+                r#type: s.r#type,
+                tool: s.tool,
+            }).collect(),
+        },
+        None => WorkflowDto { steps: vec![] },
+    }
+}
+
 /// Convert a Task proto message into a TaskDto used by the frontend.
 pub fn task_from_proto(p: tasks_proto::Task) -> TaskDto {
     TaskDto {
@@ -48,6 +60,20 @@ pub fn task_from_proto(p: tasks_proto::Task) -> TaskDto {
         created_at: ts_to_rfc3339(p.created_at),
         started_at: ts_to_rfc3339(p.started_at),
         finished_at: ts_to_rfc3339(p.finished_at),
+        workflow: workflow_from_proto(p.workflow),
+        results: p.results.into_iter().map(scan_result_from_proto).collect(),
+    }
+}
+
+pub fn scan_result_from_proto(p: tasks_proto::ScanResult) -> ScanResultDto {
+    ScanResultDto {
+        ip: p.ip,
+        port: p.port,
+        protocol: p.protocol,
+        state: p.state,
+        service: p.service,
+        tool: p.tool,
+        timestamp: p.timestamp,
     }
 }
 

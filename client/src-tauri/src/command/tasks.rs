@@ -1,6 +1,6 @@
 // Command handlers for remote task operations (list/get/create/start/stop/delete).
 // Each command logs its entry and successful completion using `tracing::info!`.
-use crate::utils::{convert, dto, grpc};
+use crate::utils::{convert, dto};
 use tracing::info;
 use crate::utils::grpc::tasks_client;
 use tauri::Emitter;
@@ -36,10 +36,19 @@ pub async fn create_task(address: String, input: dto::CreateTaskDto, use_tls: Op
     let use_tls = use_tls.unwrap_or(false);
     info!(%address, name = %input.name, "create_task called");
     let mut client = tasks_client(&address, use_tls).await.context("Failed to connect to server")?;
+    
+    let workflow = Some(crate::command::tasks_proto::Workflow {
+        steps: input.workflow.steps.into_iter().map(|s| crate::command::tasks_proto::WorkflowStep {
+            r#type: s.r#type,
+            tool: s.tool,
+        }).collect(),
+    });
+
     let req = tonic::Request::new(crate::command::tasks_proto::CreateTaskRequest {
         name: input.name,
         description: input.description.unwrap_or_default(),
         targets: input.targets.unwrap_or_default(),
+        workflow,
     });
     let resp = client.create_task(req).await.context("Failed to create task")?;
     let task = resp.into_inner();

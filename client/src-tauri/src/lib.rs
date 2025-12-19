@@ -1,8 +1,8 @@
 use crate::command::{server_info, tasks};
 
 mod command;
-mod utils;
 mod error;
+mod utils;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -24,6 +24,7 @@ pub fn run() {
             tasks::list_tasks,
             tasks::get_task,
             tasks::create_task,
+            tasks::restart_task,
             // frontend compatibility aliases
             tasks::create_scan_task,
             tasks::start_scan,

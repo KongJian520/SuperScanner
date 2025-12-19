@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { BackendConfig } from '../types';
 import { getUsagePercentage } from '@/lib/utils';
 import { Activity, Clock, Cpu, HardDrive,  RefreshCcw, Server, Terminal } from 'lucide-react';
@@ -9,6 +10,7 @@ interface BackendDetailProps {
 }
 
 export const BackendDetail: React.FC<BackendDetailProps> = ({ backend }) => {
+    const { t } = useTranslation();
     const { data: info, isLoading: loading, error, refetch } = useServerInfo(backend.id);
 
     const formatBytes = (bytes: number) => {
@@ -46,7 +48,7 @@ export const BackendDetail: React.FC<BackendDetailProps> = ({ backend }) => {
                     onClick={() => refetch()}
                     disabled={loading}
                     className="p-2 hover:bg-white/5 rounded-md text-gray-400 hover:text-white transition-colors"
-                    title="Refresh Metrics"
+                    title={t('backend_detail.refresh_metrics')}
                 >
                     <RefreshCcw size={18} className={loading ? 'animate-spin' : ''} />
                 </button>
@@ -62,31 +64,31 @@ export const BackendDetail: React.FC<BackendDetailProps> = ({ backend }) => {
                             {/* OS / System */}
                             <div className="bg-card border border-border rounded-lg p-4 flex flex-col justify-between hover:border-blue-500/30 transition-colors">
                                 <div className="flex justify-between items-start mb-2">
-                                    <span className="text-xs font-semibold text-muted-foreground uppercase">System</span>
+                                    <span className="text-xs font-semibold text-muted-foreground uppercase">{t('backend_detail.system')}</span>
                                     <Terminal size={16} className="text-gray-500" />
                                 </div>
                                 <div>
-                                    <div className="text-sm font-medium text-white truncate" title={info.os ?? 'unknown'}>{info.os ?? 'unknown'}</div>
-                                    <div className="text-xs text-gray-500 font-mono mt-1">{info.hostname ?? 'unknown'}</div>
+                                    <div className="text-sm font-medium text-white truncate" title={info.os ?? t('backend_detail.unknown')}>{info.os ?? t('backend_detail.unknown')}</div>
+                                    <div className="text-xs text-gray-500 font-mono mt-1">{info.hostname ?? t('backend_detail.unknown')}</div>
                                 </div>
                             </div>
 
                             {/* Uptime */}
                             <div className="bg-card border border-border rounded-lg p-4 flex flex-col justify-between hover:border-green-500/30 transition-colors">
                                 <div className="flex justify-between items-start mb-2">
-                                    <span className="text-xs font-semibold text-muted-foreground uppercase">Uptime</span>
+                                    <span className="text-xs font-semibold text-muted-foreground uppercase">{t('backend_detail.uptime')}</span>
                                     <Clock size={16} className="text-gray-500" />
                                 </div>
                                 <div>
                                     <div className="text-lg font-mono text-green-400">{formatUptime(info.uptimeSeconds ?? 0)}</div>
-                                    <div className="text-xs text-gray-500 mt-1">Version {info.version ?? 'unknown'}</div>
+                                    <div className="text-xs text-gray-500 mt-1">{t('backend_detail.version', { version: info.version ?? t('backend_detail.unknown') })}</div>
                                 </div>
                             </div>
 
                             {/* Load Average */}
                             <div className="bg-card border border-border rounded-lg p-4 flex flex-col justify-between hover:border-orange-500/30 transition-colors">
                                 <div className="flex justify-between items-start mb-2">
-                                    <span className="text-xs font-semibold text-muted-foreground uppercase">Load Average</span>
+                                    <span className="text-xs font-semibold text-muted-foreground uppercase">{t('backend_detail.load_average')}</span>
                                     <Activity size={16} className="text-gray-500" />
                                 </div>
                                 <div>
@@ -97,7 +99,7 @@ export const BackendDetail: React.FC<BackendDetailProps> = ({ backend }) => {
                                             </span>
                                         ))}
                                     </div>
-                                    <div className="text-xs text-gray-500 mt-2">{info.cpuCores ?? 0} Cores Available</div>
+                                    <div className="text-xs text-gray-500 mt-2">{t('backend_detail.cores_available', { count: info.cpuCores ?? 0 })}</div>
                                 </div>
                             </div>
                         </div>
@@ -108,7 +110,7 @@ export const BackendDetail: React.FC<BackendDetailProps> = ({ backend }) => {
                             <div className="bg-card border border-border rounded-lg p-5">
                                 <div className="flex items-center gap-2 mb-4">
                                     <Cpu size={18} className="text-purple-400" />
-                                    <h3 className="text-sm font-semibold text-white">Memory Usage</h3>
+                                    <h3 className="text-sm font-semibold text-white">{t('backend_detail.memory_usage')}</h3>
                                 </div>
 
                                 <div className="space-y-1">
@@ -129,7 +131,7 @@ export const BackendDetail: React.FC<BackendDetailProps> = ({ backend }) => {
                             <div className="bg-card border border-border rounded-lg p-5">
                                 <div className="flex items-center gap-2 mb-4">
                                     <HardDrive size={18} className="text-yellow-400" />
-                                    <h3 className="text-sm font-semibold text-white">Storage Usage</h3>
+                                    <h3 className="text-sm font-semibold text-white">{t('backend_detail.disk_usage')}</h3>
                                 </div>
 
                                 <div className="space-y-1">

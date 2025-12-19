@@ -18,6 +18,12 @@ export const useAppStore = create<AppState>((set) => ({
 
   toggleSidebar: () => set((state) => ({ isSidebarOpen: !state.isSidebarOpen })),
   setSidebarOpen: (open) => set({ isSidebarOpen: open }),
-  setActiveBackendId: (id) => set({ activeBackendId: id }),
-  setActiveTaskId: (id) => set({ activeTaskId: id }),
+  setActiveBackendId: (id) => {
+    console.log('[Store] setActiveBackendId:', id);
+    set({ activeBackendId: id });
+  },
+  setActiveTaskId: (id) => {
+    console.log('[Store] setActiveTaskId:', id);
+    set({ activeTaskId: id });
+  },
 }));

@@ -1,5 +1,5 @@
 use crate::core::traits::TaskStore;
-use crate::core::types::{TaskMetadata, TaskMetadataPatch};
+use crate::core::types::{TaskMetadata, TaskMetadataPatch, Workflow};
 use crate::error::AppError;
 use async_trait::async_trait;
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
@@ -41,7 +41,7 @@ impl SqliteTaskStore {
 #[async_trait]
 impl TaskStore for SqliteTaskStore {
     async fn list_tasks(&self) -> Result<Vec<TaskMetadata>, AppError> {
-        let rows = sqlx::query("SELECT id,name,description,targets,status,progress,exit_code,error_message,created_at,updated_at,started_at,finished_at,log_path FROM tasks ORDER BY created_at DESC")
+        let rows = sqlx::query("SELECT id,name,description,targets,status,progress,exit_code,error_message,created_at,updated_at,started_at,finished_at,log_path,workflow FROM tasks ORDER BY created_at DESC")
             .fetch_all(&self.pool)
             .await?;
 
@@ -55,6 +55,13 @@ impl TaskStore for SqliteTaskStore {
                 })
             } else {
                 Vec::new()
+            };
+
+            let workflow_text: Option<String> = row.try_get("workflow").ok();
+            let workflow = if let Some(s) = workflow_text {
+                serde_json::from_str(&s).unwrap_or_default()
+            } else {
+                Workflow::default()
             };
 
             out.push(TaskMetadata {
@@ -71,6 +78,7 @@ impl TaskStore for SqliteTaskStore {
                 started_at: row.get::<Option<i64>, _>("started_at"),
                 finished_at: row.get::<Option<i64>, _>("finished_at"),
                 log_path: row.get::<Option<String>, _>("log_path").unwrap_or_default(),
+                workflow,
             });
         }
         Ok(out)
@@ -88,6 +96,13 @@ impl TaskStore for SqliteTaskStore {
                 .map(|s| serde_json::from_str(&s).unwrap_or_default())
                 .unwrap_or_default();
 
+            let workflow_text: Option<String> = row.try_get("workflow").ok();
+            let workflow = if let Some(s) = workflow_text {
+                serde_json::from_str(&s).unwrap_or_default()
+            } else {
+                Workflow::default()
+            };
+
             Ok(Some(TaskMetadata {
                 id: row.get("id"),
                 name: row.get("name"),
@@ -102,6 +117,7 @@ impl TaskStore for SqliteTaskStore {
                 started_at: row.get("started_at"),
                 finished_at: row.get("finished_at"),
                 log_path: row.get::<Option<String>, _>("log_path").unwrap_or_default(),
+                workflow,
             }))
         } else {
             Ok(None)
@@ -111,10 +127,12 @@ impl TaskStore for SqliteTaskStore {
     async fn create_task(&self, meta: &TaskMetadata) -> Result<(), AppError> {
         let targets_json = serde_json::to_string(&meta.targets)
             .map_err(|e| AppError::Serialization(e.to_string()))?;
+        let workflow_json = serde_json::to_string(&meta.workflow)
+            .map_err(|e| AppError::Serialization(e.to_string()))?;
 
         sqlx::query(
-            r#"INSERT INTO tasks (id, name, description, targets, status, created_at, log_path)
-               VALUES (?, ?, ?, ?, ?, ?, ?)"#
+            r#"INSERT INTO tasks (id, name, description, targets, status, created_at, log_path, workflow)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)"#
         )
         .bind(&meta.id)
         .bind(&meta.name)
@@ -123,6 +141,7 @@ impl TaskStore for SqliteTaskStore {
         .bind(meta.status)
         .bind(meta.created_at)
         .bind(&meta.log_path)
+        .bind(workflow_json)
         .execute(&self.pool)
         .await?;
         Ok(())
@@ -173,6 +192,6 @@ impl TaskStore for SqliteTaskStore {
             .execute(&self.pool)
             .await?;
         
-        self.get_task(id).await.map(|opt| opt.expect("Task should exist"))
+        self.get_task(id).await?.ok_or_else(|| AppError::Database(sqlx::Error::RowNotFound))
     }
 }

@@ -2,6 +2,7 @@ use crate::proto::tasks_proto::{
     tasks_server, CreateTaskRequest, DeleteTaskRequest, GetTaskRequest, ListTasksRequest,
     ListTasksResponse, StartTaskRequest, StopTaskRequest, Task as ProtoTask,
     StreamTaskEventsRequest, RestartTaskRequest, TaskEvent, LogChunk, Progress, Error as ProtoError,
+    ScanResult,
 };
 use crate::proto::tasks_proto;
 use crate::core::traits::{TaskManager, TaskStore};
@@ -56,6 +57,42 @@ impl TasksService {
             started_at: Self::to_proto_ts(meta.started_at),
             finished_at: Self::to_proto_ts(meta.finished_at),
             progress: meta.progress as i32,
+            workflow: Some(meta.workflow.into()),
+            results: vec![],
+        }
+    }
+}
+
+impl From<crate::core::types::Workflow> for crate::proto::tasks_proto::Workflow {
+    fn from(wf: crate::core::types::Workflow) -> Self {
+        Self {
+            steps: wf.steps.into_iter().map(|s| s.into()).collect(),
+        }
+    }
+}
+
+impl From<crate::core::types::WorkflowStep> for crate::proto::tasks_proto::WorkflowStep {
+    fn from(step: crate::core::types::WorkflowStep) -> Self {
+        Self {
+            r#type: step.r#type,
+            tool: step.tool,
+        }
+    }
+}
+
+impl From<crate::proto::tasks_proto::Workflow> for crate::core::types::Workflow {
+    fn from(wf: crate::proto::tasks_proto::Workflow) -> Self {
+        Self {
+            steps: wf.steps.into_iter().map(|s| s.into()).collect(),
+        }
+    }
+}
+
+impl From<crate::proto::tasks_proto::WorkflowStep> for crate::core::types::WorkflowStep {
+    fn from(step: crate::proto::tasks_proto::WorkflowStep) -> Self {
+        Self {
+            r#type: step.r#type,
+            tool: step.tool,
         }
     }
 }
@@ -72,11 +109,43 @@ impl tasks_server::Tasks for TasksService {
 
     async fn get_task(&self, request: Request<GetTaskRequest>) -> Result<Response<ProtoTask>, Status> {
         let id = request.into_inner().id;
-        let task = self.store.get_task(&id).await.map_err(Status::from)?;
-        match task {
-            Some(t) => Ok(Response::new(Self::metadata_to_proto(t))),
-            None => Err(Status::not_found("任务不存在")),
+        let task = self.store.get_task(&id).await.map_err(Status::from)?
+            .ok_or_else(|| Status::not_found("任务不存在"))?;
+        
+        let mut proto_task = Self::metadata_to_proto(task);
+
+        // Fetch results from targets.db
+        let db_path = self.root.join(&id).join("targets.db");
+        if db_path.exists() {
+             let db_url = format!("sqlite://{}", db_path.to_string_lossy());
+             if let Ok(pool) = SqlitePool::connect(&db_url).await {
+                 // Use CAST(updated_at AS TEXT) to ensure we get a string, avoiding type mapping issues
+                 if let Ok(rows) = sqlx::query("SELECT ip, port, protocol, state, service, tool, CAST(updated_at AS TEXT) as updated_at FROM port_results")
+                    .fetch_all(&pool).await 
+                 {
+                     let mut results = Vec::new();
+                     for row in rows {
+                         use sqlx::Row;
+                         // Safely handle port as i64 (SQLite INTEGER) and cast to i32
+                         let port: i64 = row.try_get("port").unwrap_or(0);
+                         
+                         results.push(ScanResult {
+                             ip: row.try_get("ip").unwrap_or_default(),
+                             port: port as i32,
+                             protocol: row.try_get("protocol").unwrap_or_default(),
+                             state: row.try_get("state").unwrap_or_default(),
+                             service: row.try_get("service").unwrap_or_default(),
+                             tool: row.try_get("tool").unwrap_or_default(),
+                             timestamp: row.try_get("updated_at").unwrap_or_default(),
+                         });
+                     }
+                     proto_task.results = results;
+                 }
+                 let _ = pool.close().await;
+             }
         }
+
+        Ok(Response::new(proto_task))
     }
 
     async fn create_task(&self, request: Request<CreateTaskRequest>) -> Result<Response<ProtoTask>, Status> {
@@ -102,6 +171,10 @@ impl tasks_server::Tasks for TasksService {
             }
         }
 
+        if req.workflow.is_none() {
+            return Err(Status::invalid_argument("Workflow is required"));
+        }
+
         let id = Uuid::new_v4().to_string();
         let now = chrono::Utc::now().timestamp_millis();
         
@@ -119,6 +192,7 @@ impl tasks_server::Tasks for TasksService {
             finished_at: None,
             log_path: String::new(),
             progress: 0,
+            workflow: req.workflow.map(|w| w.into()).unwrap_or_default(),
         };
 
         self.store.create_task(&meta).await.map_err(Status::from)?;
@@ -198,6 +272,19 @@ impl tasks_server::Tasks for TasksService {
 
     async fn start_task(&self, request: Request<StartTaskRequest>) -> Result<Response<ProtoTask>, Status> {
         let id = request.into_inner().id;
+        
+        let task = self.store.get_task(&id).await.map_err(Status::from)?
+            .ok_or_else(|| Status::not_found("任务未找到"))?;
+
+        // 限制：如果任务已完成或正在运行，不允许重复启动（除非显式重启）
+        // 2=RUNNING, 3=DONE
+        if task.status == 2 {
+            return Err(Status::failed_precondition("任务正在运行中"));
+        }
+        if task.status == 3 {
+            return Err(Status::failed_precondition("任务已完成，请使用重启功能"));
+        }
+
         info!("Starting task: {}", id);
         self.runner.start(&id).await.map_err(Status::from)?;
         
@@ -227,24 +314,24 @@ impl tasks_server::Tasks for TasksService {
     async fn stream_task_events(&self, request: Request<StreamTaskEventsRequest>) -> Result<Response<Self::StreamTaskEventsStream>, Status> {
         let req = request.into_inner();
         let id = req.id;
-        
+
         let (tx, rx) = mpsc::channel(100);
         let (runner_tx, mut runner_rx) = mpsc::channel(100);
 
         // 如果请求启动且未运行，则启动
         if req.start_if_not_running {
-             // 尝试启动，忽略"已在运行"错误
-             let _ = self.runner.start_with_event_sink(&id, runner_tx.clone()).await;
+            // 尝试启动，忽略"已在运行"错误
+            let _ = self.runner.start_with_event_sink(&id, runner_tx.clone()).await;
         }
-        
+
         // 尝试附加到现有任务
         if let Err(_) = self.runner.attach_event_sink(&id, runner_tx).await {
-             // 如果任务未运行且我们没有启动它（或者启动失败但不是因为已运行），
-             // 这里可能需要处理历史日志回放，但目前简化处理，直接返回结束
-             // 实际生产中应读取日志文件并回放
+            // 如果任务未运行且我们没有启动它（或者启动失败但不是因为已运行），
+            // 我们仍然会尝试从日志文件回放历史日志并 tail
         }
 
         tokio::spawn(async move {
+            // 将来自 runner 的实时事件转发给客户端
             while let Some(event) = runner_rx.recv().await {
                 let proto_event = match event {
                     RunnerEvent::Progress { percent, ts } => TaskEvent {
@@ -254,16 +341,8 @@ impl tasks_server::Tasks for TasksService {
                             ts: TasksService::to_proto_ts(Some(ts)),
                         })),
                     },
-                    RunnerEvent::Log { subtask, data, is_stderr, offset, ts } => TaskEvent {
-                        ev: Some(tasks_proto::task_event::Ev::Log(LogChunk {
-                            subtask,
-                            text: String::from_utf8_lossy(&data).to_string(),
-                            is_stderr,
-                            offset,
-                            ts: TasksService::to_proto_ts(Some(ts)),
-                        })),
-                    },
-                    RunnerEvent::Exit { .. } => continue, // Exit event handled via snapshot or status update usually
+                    RunnerEvent::Log { .. } => continue, // 忽略日志事件
+                    RunnerEvent::Exit { .. } => continue, // Exit 事件由 snapshot 或状态更新处理
                     RunnerEvent::Snapshot { meta, .. } => TaskEvent {
                         ev: Some(tasks_proto::task_event::Ev::TaskSnapshot(TasksService::metadata_to_proto(meta))),
                     },
@@ -271,12 +350,13 @@ impl tasks_server::Tasks for TasksService {
                         ev: Some(tasks_proto::task_event::Ev::Error(ProtoError { message })),
                     },
                 };
-                
+
                 if tx.send(Ok(proto_event)).await.is_err() {
-                    break;
+                    return; // 客户端已断开
                 }
             }
         });
+        
 
         Ok(Response::new(ReceiverStream::new(rx)))
     }

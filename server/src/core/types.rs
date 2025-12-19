@@ -2,6 +2,17 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct WorkflowStep {
+    pub r#type: i32,
+    pub tool: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+pub struct Workflow {
+    pub steps: Vec<WorkflowStep>,
+}
+
 /// 任务元数据
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TaskMetadata {
@@ -19,6 +30,7 @@ pub struct TaskMetadata {
     pub started_at: Option<i64>,
     pub finished_at: Option<i64>,
     pub log_path: String,
+    pub workflow: Workflow,
 }
 
 /// 任务元数据更新补丁

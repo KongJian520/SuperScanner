@@ -9,6 +9,7 @@ pub struct NetworkInterfaceDto {
 }
 
 #[derive(Serialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct ServerInfoDto {
     pub hostname: String,
     pub os: String,
@@ -22,7 +23,31 @@ pub struct ServerInfoDto {
     pub disk_free_bytes: Option<u64>,
 }
 
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub struct WorkflowStepDto {
+    pub r#type: i32,
+    pub tool: String,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub struct WorkflowDto {
+    pub steps: Vec<WorkflowStepDto>,
+}
+
 #[derive(Serialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ScanResultDto {
+    pub ip: String,
+    pub port: i32,
+    pub protocol: String,
+    pub state: String,
+    pub service: String,
+    pub tool: String,
+    pub timestamp: String,
+}
+
+#[derive(Serialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct TaskDto {
     // Task properties exposed to the front-end
     pub id: String,
@@ -34,6 +59,8 @@ pub struct TaskDto {
     pub created_at: Option<String>,
     pub started_at: Option<String>,
     pub finished_at: Option<String>,
+    pub workflow: WorkflowDto,
+    pub results: Vec<ScanResultDto>,
 }
 
 /// DTO used when creating a new task (deserialized from JSON input)
@@ -42,6 +69,7 @@ pub struct CreateTaskDto {
     pub name: String,
     pub description: Option<String>,
     pub targets: Option<Vec<String>>,
+    pub workflow: WorkflowDto,
 }
 
 #[derive(Serialize, Debug, Clone)]

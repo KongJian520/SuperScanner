@@ -67,13 +67,8 @@ pub struct BackgroundTaskRunner {
     registry: CommandRegistry,
 }
 
-async fn append_runner_log(file: &mut Option<tokio::fs::File>, msg: &str) {
-    if let Some(f) = file {
-        let ts = chrono::Utc::now().to_rfc3339();
-        let line = format!("[{}] {}\n", ts, msg);
-        let _ = f.write_all(line.as_bytes()).await;
-        let _ = f.flush().await;
-    }
+async fn append_runner_log(_file: &mut Option<tokio::fs::File>, _msg: &str) {
+    // Log functionality disabled
 }
 
 impl BackgroundTaskRunner {
@@ -99,14 +94,8 @@ impl BackgroundTaskRunner {
         let _start_ts = Utc::now().timestamp_millis();
 
         // [新增] 创建并打开 runner.log
-        let log_path = task_dir.join("runner.log");
-        let mut runner_log_file = match OpenOptions::new().create(true).write(true).truncate(true).open(&log_path).await {
-            Ok(f) => Some(f),
-            Err(e) => {
-                error!("Failed to create runner log: {}", e);
-                None
-            }
-        };
+        // Log functionality disabled
+        let mut runner_log_file: Option<tokio::fs::File> = None;
 
         append_runner_log(&mut runner_log_file, "Task runner started").await;
 
@@ -503,8 +492,37 @@ impl TaskManager for BackgroundTaskRunner {
             return Err(AppError::Task("任务已在运行中".to_string()));
         }
 
+        let meta = self.store.get_task(id).await?.ok_or(AppError::Task("Task not found".to_string()))?;
         let task_dir = self.tasks_dir.join(id);
-        let specs = self.parser.parse(&task_dir).await?;
+
+        let specs = if !meta.workflow.steps.is_empty() {
+            let workflow = &meta.workflow;
+            let mut specs = Vec::new();
+            for step in &workflow.steps {
+                let cmd_id = if step.tool == "builtin" {
+                    match step.r#type {
+                        1 => "builtin_port_scan",
+                        2 => "httpx",
+                        3 => "nuclei",
+                        _ => "unknown",
+                    }
+                } else {
+                    &step.tool
+                };
+                
+                specs.push(CommandSpec {
+                    id: cmd_id.to_string(),
+                    program: PathBuf::from(cmd_id),
+                    targets: meta.targets.clone(),
+                    args: vec![],
+                    env: None,
+                    cwd: Some(task_dir.clone()),
+                });
+            }
+            specs
+        } else {
+            self.parser.parse(&task_dir).await?
+        };
 
         // 确保日志根目录存在
         let logs_root = task_dir.join("logs");
@@ -528,9 +546,18 @@ impl TaskManager for BackgroundTaskRunner {
         let task_id = id.to_string();
         let bc_clone = broadcaster.clone();
         let registry = self.registry.clone();
+        
+        let running_tasks_clone = self.running_tasks.clone();
+        let task_id_cleanup = id.to_string();
 
         let join_handle = tokio::spawn(async move {
             Self::run_task_loop(task_id, specs, store, bc_clone, stop_rx, task_dir, registry).await;
+            
+            // Cleanup: remove from running_tasks when done
+            let mut tasks = running_tasks_clone.write().await;
+            if tasks.remove(&task_id_cleanup).is_some() {
+                info!("Task {} removed from running_tasks map (finished naturally)", task_id_cleanup);
+            }
         });
 
         tasks.insert(

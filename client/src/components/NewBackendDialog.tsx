@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAddBackend } from '../hooks/use-scanner-api';
 import { useNavigate } from 'react-router-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from './ui/dialog';
@@ -15,6 +16,7 @@ const validateAddress = (addr: string) => {
 };
 
 const NewBackendDialog: React.FC<{ open: boolean; onCancel: () => void }> = ({ open, onCancel }) => {
+    const { t } = useTranslation();
     const { mutateAsync: addBackend, isPending: isSubmitting, error: submitError } = useAddBackend();
     const navigate = useNavigate();
 
@@ -41,8 +43,8 @@ const NewBackendDialog: React.FC<{ open: boolean; onCancel: () => void }> = ({ o
         }
     }, [open]);
 
-    const nameError = touched.name && name.trim().length === 0 ? 'Name is required' : '';
-    const addressError = touched.address && !(validateAddress(address) || (ip.trim() && /^\d{1,5}$/.test(port))) ? 'Address looks invalid' : '';
+    const nameError = touched.name && name.trim().length === 0 ? t('new_backend.name_required') : '';
+    const addressError = touched.address && !(validateAddress(address) || (ip.trim() && /^\d{1,5}$/.test(port))) ? t('new_backend.address_invalid') : '';
 
     const isValid = name.trim().length > 0 && (validateAddress(address) || (ip.trim().length > 0 && port.trim().length > 0));
 
@@ -70,22 +72,22 @@ const NewBackendDialog: React.FC<{ open: boolean; onCancel: () => void }> = ({ o
         <Dialog open={open} onOpenChange={(v) => !v && onCancel()}>
             <DialogContent className="sm:max-w-[425px]">
                 <DialogHeader>
-                    <DialogTitle>Add New Backend</DialogTitle>
+                    <DialogTitle>{t('new_backend.title')}</DialogTitle>
                     <DialogDescription>
-                        Connect to a new SuperScanner server instance.
+                        {t('new_backend.description')}
                     </DialogDescription>
                 </DialogHeader>
                 
                 <form onSubmit={handleSubmit} className="grid gap-4 py-4">
                     <div className="grid gap-2">
-                        <Label htmlFor="name" className={nameError ? "text-destructive" : ""}>Name</Label>
+                        <Label htmlFor="name" className={nameError ? "text-destructive" : ""}>{t('new_backend.name_label')}</Label>
                         <Input
                             id="name"
                             ref={nameRef}
                             value={name}
                             onChange={e => setName(e.target.value)}
                             onBlur={() => setTouched(t => ({ ...t, name: true }))}
-                            placeholder="Production Server"
+                            placeholder={t('new_backend.name_placeholder')}
                             className={nameError ? "border-destructive focus-visible:ring-destructive" : ""}
                             disabled={isSubmitting}
                         />
@@ -93,20 +95,20 @@ const NewBackendDialog: React.FC<{ open: boolean; onCancel: () => void }> = ({ o
                     </div>
 
                     <div className="grid gap-2">
-                        <Label>Connection Details</Label>
+                        <Label>{t('new_backend.connection_details')}</Label>
                         <div className="grid grid-cols-5 gap-2">
                             <Input
                                 className="col-span-3"
                                 value={ip}
                                 onChange={e => setIp(e.target.value)}
-                                placeholder="IP / Hostname"
+                                placeholder={t('new_backend.ip_placeholder')}
                                 disabled={isSubmitting}
                             />
                             <Input
                                 className="col-span-2"
                                 value={port}
                                 onChange={e => setPort(e.target.value)}
-                                placeholder="Port"
+                                placeholder={t('new_backend.port_placeholder')}
                                 disabled={isSubmitting}
                             />
                         </div>
@@ -115,13 +117,13 @@ const NewBackendDialog: React.FC<{ open: boolean; onCancel: () => void }> = ({ o
                                 <span className="w-full border-t" />
                             </div>
                             <div className="relative flex justify-center text-xs uppercase">
-                                <span className="bg-background px-2 text-muted-foreground">Or full URL</span>
+                                <span className="bg-background px-2 text-muted-foreground">{t('new_backend.or_full_url')}</span>
                             </div>
                         </div>
                         <Input
                             value={address}
                             onChange={e => setAddress(e.target.value)}
-                            placeholder="https://api.example.com:5000"
+                            placeholder={t('new_backend.url_placeholder')}
                             disabled={isSubmitting}
                             className={addressError ? "border-destructive focus-visible:ring-destructive" : ""}
                         />
@@ -129,12 +131,12 @@ const NewBackendDialog: React.FC<{ open: boolean; onCancel: () => void }> = ({ o
                     </div>
 
                     <div className="grid gap-2">
-                        <Label htmlFor="description">Description</Label>
+                        <Label htmlFor="description">{t('new_backend.desc_label')}</Label>
                         <Input
                             id="description"
                             value={description}
                             onChange={e => setDescription(e.target.value)}
-                            placeholder="Optional notes..."
+                            placeholder={t('new_backend.desc_placeholder')}
                             disabled={isSubmitting}
                         />
                     </div>
@@ -151,10 +153,10 @@ const NewBackendDialog: React.FC<{ open: boolean; onCancel: () => void }> = ({ o
                         <div className="flex-1 space-y-1">
                             <Label htmlFor="tls" className="cursor-pointer flex items-center gap-2">
                                 {useTls ? <Shield size={14} className="text-green-500"/> : <ShieldAlert size={14} className="text-muted-foreground"/>}
-                                Use TLS / SSL
+                                {t('new_backend.use_tls')}
                             </Label>
                             <p className="text-xs text-muted-foreground">
-                                Enable if the server requires a secure connection (HTTPS/GRPCS).
+                                {t('new_backend.tls_help')}
                             </p>
                         </div>
                     </div>
@@ -168,10 +170,10 @@ const NewBackendDialog: React.FC<{ open: boolean; onCancel: () => void }> = ({ o
 
                 <DialogFooter>
                     <Button variant="outline" onClick={onCancel} disabled={isSubmitting}>
-                        Cancel
+                        {t('new_backend.cancel')}
                     </Button>
                     <Button onClick={handleSubmit} disabled={!isValid || isSubmitting}>
-                        {isSubmitting ? 'Connecting...' : 'Add Backend'}
+                        {isSubmitting ? t('new_backend.connecting') : t('new_backend.add_backend')}
                     </Button>
                 </DialogFooter>
             </DialogContent>

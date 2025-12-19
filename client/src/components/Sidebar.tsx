@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import {
     Activity,
     Box,
@@ -25,6 +26,7 @@ const TaskEventListener: React.FC<{ backendId: string | null, taskId: string }> 
 };
 
 export const Sidebar: React.FC = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const matchTask = useMatch('/task/:id');
@@ -101,19 +103,19 @@ export const Sidebar: React.FC = () => {
       <div className={`flex ${isSidebarOpen ? 'flex-row' : 'flex-col'} items-center p-2 gap-1 border-b border-border`}>
         <button
           onClick={() => navigate('/tasks')}
-          title="Tasks"
+          title={t('sidebar.tasks')}
           className={`flex-1 flex items-center justify-center gap-2 py-1.5 text-xs font-medium rounded-md transition-colors w-full ${tab === 'tasks' ? 'bg-secondary text-white' : 'text-muted-foreground hover:bg-white/5'}`}
         >
           <List size={14} />
-          {isSidebarOpen && <span>Tasks</span>}
+          {isSidebarOpen && <span>{t('sidebar.tasks')}</span>}
         </button>
         <button
           onClick={() => navigate('/servers')}
-          title="Backends"
+          title={t('sidebar.backends')}
           className={`flex-1 flex items-center justify-center gap-2 py-1.5 text-xs font-medium rounded-md transition-colors w-full ${tab === 'backends' ? 'bg-secondary text-white' : 'text-muted-foreground hover:bg-white/5'}`}
         >
           <Server size={14} />
-          {isSidebarOpen && <span>Backends</span>}
+          {isSidebarOpen && <span>{t('sidebar.backends')}</span>}
         </button>
       </div>
 
@@ -122,20 +124,20 @@ export const Sidebar: React.FC = () => {
         {tab === 'tasks' ? (
           <button
             onClick={handleNewTask}
-            title="New Scan Task"
+            title={t('sidebar.new_task')}
             className={`w-full flex items-center justify-center gap-2 bg-white text-black hover:bg-gray-200 transition-colors py-2 px-4 rounded-md text-sm font-semibold shadow-sm`}
           >
             <Plus size={16} />
-            {isSidebarOpen && <span>New Scan Task</span>}
+            {isSidebarOpen && <span>{t('sidebar.new_task')}</span>}
           </button>
         ) : (
           <button
             onClick={handleNewBackend}
-            title="Add Backend"
+            title={t('sidebar.add_backend')}
             className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white hover:bg-blue-500 transition-colors py-2 px-4 rounded-md text-sm font-semibold shadow-sm"
           >
             <Plus size={16} />
-            {isSidebarOpen && <span>Add Backend</span>}
+            {isSidebarOpen && <span>{t('sidebar.add_backend')}</span>}
           </button>
         )}
       </div>
@@ -144,14 +146,14 @@ export const Sidebar: React.FC = () => {
       <div className="flex-1 overflow-y-auto p-2 space-y-1 overflow-x-hidden">
         {isSidebarOpen && (
           <div className="px-2 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider whitespace-nowrap">
-            {tab === 'tasks' ? 'Active Tasks' : 'Configured Engines'}
+            {tab === 'tasks' ? t('sidebar.active_tasks') : t('sidebar.configured_engines')}
           </div>
         )}
 
         {tab === 'tasks' ? (
           tasks.length === 0 ? (
             <div className={`px-4 py-8 text-center text-sm text-muted-foreground ${!isSidebarOpen && 'hidden'}`}>
-              No active scans.
+              {t('sidebar.no_active_scans')}
             </div>
           ) : (
             tasks.map((task) => (
@@ -182,7 +184,7 @@ export const Sidebar: React.FC = () => {
                     <div className="flex flex-col truncate">
                       <span className="font-medium text-sm truncate">{task.name}</span>
                       <span className="text-[10px] opacity-60 truncate">
-                        {task.targets.length} targets • {task.progress}%
+                        {t('sidebar.targets', { count: task.targets.length })} • {task.progress}%
                       </span>
                     </div>
                   )}
@@ -192,7 +194,7 @@ export const Sidebar: React.FC = () => {
                   <button
                     onClick={(e) => handleDeleteTask(task.id, e)}
                     className="relative z-10 opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-500/20 hover:text-red-400 rounded-md transition-all"
-                    title="Delete Task"
+                    title={t('sidebar.delete_task')}
                   >
                     <Trash2 size={14} />
                   </button>
@@ -203,7 +205,7 @@ export const Sidebar: React.FC = () => {
         ) : (
           backends.length === 0 ? (
             <div className={`px-4 py-8 text-center text-sm text-muted-foreground ${!isSidebarOpen && 'hidden'}`}>
-              No backends.
+              {t('sidebar.no_backends')}
             </div>
           ) : (
             backends.map((backend) => (
@@ -235,7 +237,7 @@ export const Sidebar: React.FC = () => {
                   <button
                     onClick={(e) => handleDeleteBackend(backend.id, e)}
                     className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-500/20 hover:text-red-400 rounded-md transition-all"
-                    title="Delete Backend"
+                    title={t('sidebar.delete_backend')}
                   >
                     <Trash2 size={14} />
                   </button>
@@ -250,7 +252,7 @@ export const Sidebar: React.FC = () => {
       <div className="p-4 border-t border-border">
         <button className={`flex items-center ${isSidebarOpen ? 'justify-start' : 'justify-center'} gap-3 text-muted-foreground hover:text-white transition-colors w-full`}>
           <Settings size={18} />
-          {isSidebarOpen && <span className="text-sm font-medium">Settings</span>}
+          {isSidebarOpen && <span className="text-sm font-medium">{t('sidebar.settings')}</span>}
         </button>
       </div>
 

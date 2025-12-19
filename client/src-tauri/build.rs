@@ -6,6 +6,9 @@ fn main() {
         .join("..")
         .join("..")
         .join("proto");
+    
+    println!("cargo:rerun-if-changed={}", proto_root.display());
+
     // Use the compiler-provided OUT_DIR so `tonic::include_proto!` can find generated files
     tonic_prost_build::configure()
         .compile_protos(

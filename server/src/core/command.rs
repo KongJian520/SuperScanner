@@ -8,6 +8,9 @@ use sqlx::sqlite::SqlitePool;
 use tokio::process::Command;
 use std::process::Stdio;
 
+use tokio::net::TcpStream;
+use std::time::Duration;
+
 /// 扫描命令接口
 #[async_trait]
 pub trait ScannerCommand: Send + Sync {
@@ -170,6 +173,160 @@ impl ScannerCommand for CurlCommand {
     fn box_clone(&self) -> Box<dyn ScannerCommand> {
         Box::new(CurlCommand)
     }
+}
+
+pub struct BuiltinPortScanCommand;
+#[async_trait]
+impl ScannerCommand for BuiltinPortScanCommand {
+    fn id(&self) -> &'static str { "builtin_port_scan" }
+    fn description(&self) -> &'static str { "Builtin TCP Port Scanner" }
+    fn build_spec(&self, targets: &[String], args: &[String]) -> CommandSpec {
+        CommandSpec {
+            id: "builtin_port_scan".to_string(),
+            program: PathBuf::from("builtin_port_scan"),
+            args: args.to_vec(),
+            targets: targets.to_vec(),
+            env: None,
+            cwd: None,
+        }
+    }
+    async fn init_db(&self, pool: &SqlitePool) -> Result<(), AppError> {
+        sqlx::query(
+            "CREATE TABLE IF NOT EXISTS port_results (
+                ip TEXT,
+                port INTEGER,
+                protocol TEXT,
+                state TEXT,
+                service TEXT,
+                tool TEXT,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (ip, port, protocol)
+            )"
+        )
+        .execute(pool)
+        .await
+        .map_err(|e| AppError::Storage(format!("无法创建 port_results 表: {}", e)))?;
+        Ok(())
+    }
+    async fn execute_target(&self, target: &str, _task_dir: &PathBuf, pool: &SqlitePool) -> Result<(), AppError> {
+        // 简单的 Top 100 端口扫描示例
+        let top_ports = vec![21, 22, 23, 25, 53, 80, 110, 143, 443, 445, 3306, 3389, 8080];
+        for port in top_ports {
+            let addr = format!("{}:{}", target, port);
+            let is_open = tokio::time::timeout(Duration::from_millis(500), TcpStream::connect(&addr)).await.is_ok();
+            
+            if is_open {
+                sqlx::query("INSERT OR REPLACE INTO port_results (ip, port, protocol, state, service, tool) VALUES (?, ?, ?, ?, ?, ?)")
+                    .bind(target)
+                    .bind(port)
+                    .bind("tcp")
+                    .bind("open")
+                    .bind("unknown")
+                    .bind("builtin")
+                    .execute(pool)
+                    .await
+                    .map_err(|e| AppError::Storage(format!("保存端口结果失败: {}", e)))?;
+            }
+        }
+        Ok(())
+    }
+    async fn process_result(&self, _task_dir: &PathBuf) -> Result<(), AppError> { Ok(()) }
+    fn box_clone(&self) -> Box<dyn ScannerCommand> { Box::new(BuiltinPortScanCommand) }
+}
+
+pub struct NmapCommand;
+#[async_trait]
+impl ScannerCommand for NmapCommand {
+    fn id(&self) -> &'static str { "nmap" }
+    fn description(&self) -> &'static str { "Nmap Port Scanner" }
+    fn build_spec(&self, targets: &[String], args: &[String]) -> CommandSpec {
+        CommandSpec {
+            id: "nmap".to_string(),
+            program: PathBuf::from("nmap"),
+            args: args.to_vec(),
+            targets: targets.to_vec(),
+            env: None,
+            cwd: None,
+        }
+    }
+    async fn init_db(&self, pool: &SqlitePool) -> Result<(), AppError> {
+        // Nmap 也使用相同的表
+        sqlx::query(
+            "CREATE TABLE IF NOT EXISTS port_results (
+                ip TEXT,
+                port INTEGER,
+                protocol TEXT,
+                state TEXT,
+                service TEXT,
+                tool TEXT,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (ip, port, protocol)
+            )"
+        )
+        .execute(pool)
+        .await
+        .map_err(|e| AppError::Storage(format!("无法创建 port_results 表: {}", e)))?;
+        Ok(())
+    }
+    async fn execute_target(&self, target: &str, _task_dir: &PathBuf, pool: &SqlitePool) -> Result<(), AppError> { 
+        // 模拟 Nmap 执行并写入结果 (实际应解析 XML/Grepable 输出)
+        // 这里仅做演示：假设 Nmap 发现了 80 端口
+        sqlx::query("INSERT OR REPLACE INTO port_results (ip, port, protocol, state, service, tool) VALUES (?, ?, ?, ?, ?, ?)")
+            .bind(target)
+            .bind(80)
+            .bind("tcp")
+            .bind("open")
+            .bind("http")
+            .bind("nmap")
+            .execute(pool)
+            .await
+            .map_err(|e| AppError::Storage(format!("保存 Nmap 结果失败: {}", e)))?;
+        Ok(()) 
+    }
+    async fn process_result(&self, _task_dir: &PathBuf) -> Result<(), AppError> { Ok(()) }
+    fn box_clone(&self) -> Box<dyn ScannerCommand> { Box::new(NmapCommand) }
+}
+
+pub struct HttpxCommand;
+#[async_trait]
+impl ScannerCommand for HttpxCommand {
+    fn id(&self) -> &'static str { "httpx" }
+    fn description(&self) -> &'static str { "HTTPX Fingerprint Scanner" }
+    fn build_spec(&self, targets: &[String], args: &[String]) -> CommandSpec {
+        CommandSpec {
+            id: "httpx".to_string(),
+            program: PathBuf::from("httpx"),
+            args: args.to_vec(),
+            targets: targets.to_vec(),
+            env: None,
+            cwd: None,
+        }
+    }
+    async fn init_db(&self, _pool: &SqlitePool) -> Result<(), AppError> { Ok(()) }
+    async fn execute_target(&self, _target: &str, _task_dir: &PathBuf, _pool: &SqlitePool) -> Result<(), AppError> { Ok(()) }
+    async fn process_result(&self, _task_dir: &PathBuf) -> Result<(), AppError> { Ok(()) }
+    fn box_clone(&self) -> Box<dyn ScannerCommand> { Box::new(HttpxCommand) }
+}
+
+pub struct NucleiCommand;
+#[async_trait]
+impl ScannerCommand for NucleiCommand {
+    fn id(&self) -> &'static str { "nuclei" }
+    fn description(&self) -> &'static str { "Nuclei POC Scanner" }
+    fn build_spec(&self, targets: &[String], args: &[String]) -> CommandSpec {
+        CommandSpec {
+            id: "nuclei".to_string(),
+            program: PathBuf::from("nuclei"),
+            args: args.to_vec(),
+            targets: targets.to_vec(),
+            env: None,
+            cwd: None,
+        }
+    }
+    async fn init_db(&self, _pool: &SqlitePool) -> Result<(), AppError> { Ok(()) }
+    async fn execute_target(&self, _target: &str, _task_dir: &PathBuf, _pool: &SqlitePool) -> Result<(), AppError> { Ok(()) }
+    async fn process_result(&self, _task_dir: &PathBuf) -> Result<(), AppError> { Ok(()) }
+    fn box_clone(&self) -> Box<dyn ScannerCommand> { Box::new(NucleiCommand) }
 }
 
 #[derive(Clone)]

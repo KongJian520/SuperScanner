@@ -11,18 +11,36 @@ export enum TaskStatus {
   PAUSED = 6
 }
 
+export enum ScanType {
+  Unspecified = 0,
+  Port = 1,
+  Fingerprint = 2,
+  Poc = 3
+}
+
+export interface WorkflowStep {
+  type: ScanType;
+  tool: string;
+}
+
+export interface Workflow {
+  steps: WorkflowStep[];
+}
+
 export interface ScanTarget {
   target: string;
   portRange?: string;
   options?: Record<string, any>;
 }
 
-export interface LogEntry {
-  id?: string;
-  timestamp: number;
-  level: 'info' | 'warn' | 'error' | 'success';
-  message: string;
-  source?: string;
+export interface ScanResult {
+  ip: string;
+  port: number;
+  protocol: string;
+  state: string;
+  service: string;
+  tool: string;
+  timestamp: string;
 }
 
 export interface Task {
@@ -47,8 +65,9 @@ export interface Task {
   backendId?: string;
   // `backend` (type field) removed. Use `backendId` to reference a backend.
   progress: number;
-  logs: LogEntry[];
   result?: string;
+  workflow: Workflow;
+  results: ScanResult[];
 }
 
 export interface BackendConfig {
