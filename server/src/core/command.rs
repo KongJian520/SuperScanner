@@ -1,15 +1,15 @@
 use crate::core::types::CommandSpec;
 use crate::error::AppError;
 use async_trait::async_trait;
-use std::path::PathBuf;
-use std::sync::Arc;
-use std::collections::HashMap;
 use sqlx::sqlite::SqlitePool;
-use tokio::process::Command;
+use std::collections::HashMap;
+use std::path::PathBuf;
 use std::process::Stdio;
+use std::sync::Arc;
+use tokio::process::Command;
 
-use tokio::net::TcpStream;
 use std::time::Duration;
+use tokio::net::TcpStream;
 
 /// 扫描命令接口
 #[async_trait]
@@ -17,13 +17,18 @@ pub trait ScannerCommand: Send + Sync {
     fn id(&self) -> &'static str;
     fn description(&self) -> &'static str;
     fn build_spec(&self, targets: &[String], args: &[String]) -> CommandSpec;
-    
+
     /// 初始化命令所需的数据库表
     async fn init_db(&self, pool: &SqlitePool) -> Result<(), AppError>;
-    
+
     /// 执行命令逻辑（如果返回 Some，则 Runner 使用此逻辑代替默认进程启动）
     /// 并发数由 Runner 控制，这里只定义单个目标的处理逻辑
-    async fn execute_target(&self, target: &str, task_dir: &PathBuf, pool: &SqlitePool) -> Result<(), AppError>;
+    async fn execute_target(
+        &self,
+        target: &str,
+        task_dir: &PathBuf,
+        pool: &SqlitePool,
+    ) -> Result<(), AppError>;
 
     /// 处理命令执行结果（旧模式保留，用于后处理）
     async fn process_result(&self, task_dir: &PathBuf) -> Result<(), AppError>;
@@ -40,10 +45,14 @@ pub struct PingCommand;
 
 #[async_trait]
 impl ScannerCommand for PingCommand {
-    fn id(&self) -> &'static str { "ping" }
-    
-    fn description(&self) -> &'static str { "ICMP Ping 连通性测试" }
-    
+    fn id(&self) -> &'static str {
+        "ping"
+    }
+
+    fn description(&self) -> &'static str {
+        "ICMP Ping 连通性测试"
+    }
+
     fn build_spec(&self, targets: &[String], user_args: &[String]) -> CommandSpec {
         // 旧模式的 Spec 构建，保留以防万一
         let program = PathBuf::from("ping");
@@ -79,7 +88,7 @@ impl ScannerCommand for PingCommand {
                 latency_ms REAL, 
                 output TEXT,
                 updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-            )"
+            )",
         )
         .execute(pool)
         .await
@@ -87,7 +96,12 @@ impl ScannerCommand for PingCommand {
         Ok(())
     }
 
-    async fn execute_target(&self, target: &str, _task_dir: &PathBuf, pool: &SqlitePool) -> Result<(), AppError> {
+    async fn execute_target(
+        &self,
+        target: &str,
+        _task_dir: &PathBuf,
+        pool: &SqlitePool,
+    ) -> Result<(), AppError> {
         // 执行系统 Ping 命令
         let mut cmd = if cfg!(target_os = "windows") {
             let mut c = Command::new("ping");
@@ -100,15 +114,14 @@ impl ScannerCommand for PingCommand {
         };
 
         cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
-        
-        let output = cmd.output().await
-            .map_err(|e| AppError::Io(e))?;
-            
+
+        let output = cmd.output().await.map_err(|e| AppError::Io(e))?;
+
         let stdout = String::from_utf8_lossy(&output.stdout).to_string();
         let is_success = output.status.success();
-        
+
         // 简单解析延迟 (仅示例，实际需更复杂正则)
-        let latency = 0.0; 
+        let latency = 0.0;
 
         sqlx::query("INSERT OR REPLACE INTO ping_results (ip, is_alive, latency_ms, output) VALUES (?, ?, ?, ?)")
             .bind(target)
@@ -135,10 +148,14 @@ pub struct CurlCommand;
 
 #[async_trait]
 impl ScannerCommand for CurlCommand {
-    fn id(&self) -> &'static str { "curl" }
-    
-    fn description(&self) -> &'static str { "HTTP 请求测试" }
-    
+    fn id(&self) -> &'static str {
+        "curl"
+    }
+
+    fn description(&self) -> &'static str {
+        "HTTP 请求测试"
+    }
+
     fn build_spec(&self, targets: &[String], user_args: &[String]) -> CommandSpec {
         let program = PathBuf::from("curl");
         let mut args = vec!["-I".to_string()];
@@ -162,7 +179,12 @@ impl ScannerCommand for CurlCommand {
         Ok(())
     }
 
-    async fn execute_target(&self, _target: &str, _task_dir: &PathBuf, _pool: &SqlitePool) -> Result<(), AppError> {
+    async fn execute_target(
+        &self,
+        _target: &str,
+        _task_dir: &PathBuf,
+        _pool: &SqlitePool,
+    ) -> Result<(), AppError> {
         Ok(())
     }
 
@@ -178,8 +200,12 @@ impl ScannerCommand for CurlCommand {
 pub struct BuiltinPortScanCommand;
 #[async_trait]
 impl ScannerCommand for BuiltinPortScanCommand {
-    fn id(&self) -> &'static str { "builtin_port_scan" }
-    fn description(&self) -> &'static str { "Builtin TCP Port Scanner" }
+    fn id(&self) -> &'static str {
+        "builtin_port_scan"
+    }
+    fn description(&self) -> &'static str {
+        "Builtin TCP Port Scanner"
+    }
     fn build_spec(&self, targets: &[String], args: &[String]) -> CommandSpec {
         CommandSpec {
             id: "builtin_port_scan".to_string(),
@@ -201,20 +227,28 @@ impl ScannerCommand for BuiltinPortScanCommand {
                 tool TEXT,
                 updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 PRIMARY KEY (ip, port, protocol)
-            )"
+            )",
         )
         .execute(pool)
         .await
         .map_err(|e| AppError::Storage(format!("无法创建 port_results 表: {}", e)))?;
         Ok(())
     }
-    async fn execute_target(&self, target: &str, _task_dir: &PathBuf, pool: &SqlitePool) -> Result<(), AppError> {
+    async fn execute_target(
+        &self,
+        target: &str,
+        _task_dir: &PathBuf,
+        pool: &SqlitePool,
+    ) -> Result<(), AppError> {
         // 简单的 Top 100 端口扫描示例
         let top_ports = vec![21, 22, 23, 25, 53, 80, 110, 143, 443, 445, 3306, 3389, 8080];
         for port in top_ports {
             let addr = format!("{}:{}", target, port);
-            let is_open = tokio::time::timeout(Duration::from_millis(500), TcpStream::connect(&addr)).await.is_ok();
-            
+            let is_open =
+                tokio::time::timeout(Duration::from_millis(500), TcpStream::connect(&addr))
+                    .await
+                    .is_ok();
+
             if is_open {
                 sqlx::query("INSERT OR REPLACE INTO port_results (ip, port, protocol, state, service, tool) VALUES (?, ?, ?, ?, ?, ?)")
                     .bind(target)
@@ -230,15 +264,23 @@ impl ScannerCommand for BuiltinPortScanCommand {
         }
         Ok(())
     }
-    async fn process_result(&self, _task_dir: &PathBuf) -> Result<(), AppError> { Ok(()) }
-    fn box_clone(&self) -> Box<dyn ScannerCommand> { Box::new(BuiltinPortScanCommand) }
+    async fn process_result(&self, _task_dir: &PathBuf) -> Result<(), AppError> {
+        Ok(())
+    }
+    fn box_clone(&self) -> Box<dyn ScannerCommand> {
+        Box::new(BuiltinPortScanCommand)
+    }
 }
 
 pub struct NmapCommand;
 #[async_trait]
 impl ScannerCommand for NmapCommand {
-    fn id(&self) -> &'static str { "nmap" }
-    fn description(&self) -> &'static str { "Nmap Port Scanner" }
+    fn id(&self) -> &'static str {
+        "nmap"
+    }
+    fn description(&self) -> &'static str {
+        "Nmap Port Scanner"
+    }
     fn build_spec(&self, targets: &[String], args: &[String]) -> CommandSpec {
         CommandSpec {
             id: "nmap".to_string(),
@@ -261,14 +303,19 @@ impl ScannerCommand for NmapCommand {
                 tool TEXT,
                 updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 PRIMARY KEY (ip, port, protocol)
-            )"
+            )",
         )
         .execute(pool)
         .await
         .map_err(|e| AppError::Storage(format!("无法创建 port_results 表: {}", e)))?;
         Ok(())
     }
-    async fn execute_target(&self, target: &str, _task_dir: &PathBuf, pool: &SqlitePool) -> Result<(), AppError> { 
+    async fn execute_target(
+        &self,
+        target: &str,
+        _task_dir: &PathBuf,
+        pool: &SqlitePool,
+    ) -> Result<(), AppError> {
         // 模拟 Nmap 执行并写入结果 (实际应解析 XML/Grepable 输出)
         // 这里仅做演示：假设 Nmap 发现了 80 端口
         sqlx::query("INSERT OR REPLACE INTO port_results (ip, port, protocol, state, service, tool) VALUES (?, ?, ?, ?, ?, ?)")
@@ -281,17 +328,25 @@ impl ScannerCommand for NmapCommand {
             .execute(pool)
             .await
             .map_err(|e| AppError::Storage(format!("保存 Nmap 结果失败: {}", e)))?;
-        Ok(()) 
+        Ok(())
     }
-    async fn process_result(&self, _task_dir: &PathBuf) -> Result<(), AppError> { Ok(()) }
-    fn box_clone(&self) -> Box<dyn ScannerCommand> { Box::new(NmapCommand) }
+    async fn process_result(&self, _task_dir: &PathBuf) -> Result<(), AppError> {
+        Ok(())
+    }
+    fn box_clone(&self) -> Box<dyn ScannerCommand> {
+        Box::new(NmapCommand)
+    }
 }
 
 pub struct HttpxCommand;
 #[async_trait]
 impl ScannerCommand for HttpxCommand {
-    fn id(&self) -> &'static str { "httpx" }
-    fn description(&self) -> &'static str { "HTTPX Fingerprint Scanner" }
+    fn id(&self) -> &'static str {
+        "httpx"
+    }
+    fn description(&self) -> &'static str {
+        "HTTPX Fingerprint Scanner"
+    }
     fn build_spec(&self, targets: &[String], args: &[String]) -> CommandSpec {
         CommandSpec {
             id: "httpx".to_string(),
@@ -302,17 +357,34 @@ impl ScannerCommand for HttpxCommand {
             cwd: None,
         }
     }
-    async fn init_db(&self, _pool: &SqlitePool) -> Result<(), AppError> { Ok(()) }
-    async fn execute_target(&self, _target: &str, _task_dir: &PathBuf, _pool: &SqlitePool) -> Result<(), AppError> { Ok(()) }
-    async fn process_result(&self, _task_dir: &PathBuf) -> Result<(), AppError> { Ok(()) }
-    fn box_clone(&self) -> Box<dyn ScannerCommand> { Box::new(HttpxCommand) }
+    async fn init_db(&self, _pool: &SqlitePool) -> Result<(), AppError> {
+        Ok(())
+    }
+    async fn execute_target(
+        &self,
+        _target: &str,
+        _task_dir: &PathBuf,
+        _pool: &SqlitePool,
+    ) -> Result<(), AppError> {
+        Ok(())
+    }
+    async fn process_result(&self, _task_dir: &PathBuf) -> Result<(), AppError> {
+        Ok(())
+    }
+    fn box_clone(&self) -> Box<dyn ScannerCommand> {
+        Box::new(HttpxCommand)
+    }
 }
 
 pub struct NucleiCommand;
 #[async_trait]
 impl ScannerCommand for NucleiCommand {
-    fn id(&self) -> &'static str { "nuclei" }
-    fn description(&self) -> &'static str { "Nuclei POC Scanner" }
+    fn id(&self) -> &'static str {
+        "nuclei"
+    }
+    fn description(&self) -> &'static str {
+        "Nuclei POC Scanner"
+    }
     fn build_spec(&self, targets: &[String], args: &[String]) -> CommandSpec {
         CommandSpec {
             id: "nuclei".to_string(),
@@ -323,10 +395,23 @@ impl ScannerCommand for NucleiCommand {
             cwd: None,
         }
     }
-    async fn init_db(&self, _pool: &SqlitePool) -> Result<(), AppError> { Ok(()) }
-    async fn execute_target(&self, _target: &str, _task_dir: &PathBuf, _pool: &SqlitePool) -> Result<(), AppError> { Ok(()) }
-    async fn process_result(&self, _task_dir: &PathBuf) -> Result<(), AppError> { Ok(()) }
-    fn box_clone(&self) -> Box<dyn ScannerCommand> { Box::new(NucleiCommand) }
+    async fn init_db(&self, _pool: &SqlitePool) -> Result<(), AppError> {
+        Ok(())
+    }
+    async fn execute_target(
+        &self,
+        _target: &str,
+        _task_dir: &PathBuf,
+        _pool: &SqlitePool,
+    ) -> Result<(), AppError> {
+        Ok(())
+    }
+    async fn process_result(&self, _task_dir: &PathBuf) -> Result<(), AppError> {
+        Ok(())
+    }
+    fn box_clone(&self) -> Box<dyn ScannerCommand> {
+        Box::new(NucleiCommand)
+    }
 }
 
 #[derive(Clone)]
@@ -340,19 +425,22 @@ impl CommandRegistry {
             commands: Arc::new(HashMap::new()),
         }
     }
-    
+
     pub fn register<C: ScannerCommand + 'static>(mut self, cmd: C) -> Self {
         let mut map = Arc::try_unwrap(self.commands).unwrap_or_else(|arc| (*arc).clone());
         map.insert(cmd.id().to_string(), Box::new(cmd));
         self.commands = Arc::new(map);
         self
     }
-    
+
     pub fn get(&self, id: &str) -> Option<&dyn ScannerCommand> {
         self.commands.get(id).map(|b| b.as_ref())
     }
-    
+
     pub fn list_commands(&self) -> Vec<(&str, &str)> {
-        self.commands.values().map(|c| (c.id(), c.description())).collect()
+        self.commands
+            .values()
+            .map(|c| (c.id(), c.description()))
+            .collect()
     }
 }
