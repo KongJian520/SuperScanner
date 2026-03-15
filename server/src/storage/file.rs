@@ -1,18 +1,21 @@
-use crate::core::traits::TaskStore;
-use crate::core::types::{TaskMetadata, TaskMetadataPatch};
+use crate::domain::traits::TaskStore;
+use crate::domain::types::{TaskMetadata, TaskMetadataPatch};
 use crate::error::AppError;
 use async_trait::async_trait;
 use std::path::PathBuf;
 use tokio::fs;
 use tokio::io::AsyncWriteExt;
+use tokio::sync::Mutex;
+use std::sync::Arc;
 
 pub struct FileTaskStore {
     root_dir: PathBuf,
+    write_lock: Arc<Mutex<()>>,
 }
 
 impl FileTaskStore {
     pub fn new(root_dir: PathBuf) -> Self {
-        Self { root_dir }
+        Self { root_dir, write_lock: Arc::new(Mutex::new(())) }
     }
 
     async fn get_task_path(&self, id: &str) -> PathBuf {
@@ -20,6 +23,7 @@ impl FileTaskStore {
     }
 
     async fn save_metadata(&self, path: &PathBuf, meta: &TaskMetadata) -> Result<(), AppError> {
+        let _lock = self.write_lock.lock().await;
         let content = toml::to_string_pretty(meta)
             .map_err(|e| AppError::Storage(format!("序列化失败: {}", e)))?;
         
@@ -112,6 +116,7 @@ impl TaskStore for FileTaskStore {
         if let Some(v) = &patch.description { meta.description = v.clone(); }
         if let Some(v) = &patch.targets { meta.targets = v.clone(); }
         if let Some(v) = patch.status { meta.status = v; }
+        if let Some(v) = patch.progress { meta.progress = v; }
         if let Some(v) = patch.exit_code { meta.exit_code = v; }
         if let Some(v) = &patch.error_message { meta.error_message = v.clone(); }
         if let Some(v) = patch.updated_at { meta.updated_at = Some(v); }
@@ -134,7 +139,7 @@ impl TaskStore for FileTaskStore {
     async fn set_status(&self, id: &str, status: i32, progress: Option<u8>, exit_code: Option<i32>, error: Option<String>, finished_at: Option<i64>) -> Result<(), AppError> {
         let patch = TaskMetadataPatch {
             status: Some(status),
-            progress: Some(progress.unwrap_or(0)),
+            progress,  // 直接传递 Option，None 表示不更新
             exit_code,
             error_message: error,
             finished_at,
@@ -164,5 +169,83 @@ impl TaskStore for FileTaskStore {
 
         self.save_metadata(&path, &meta).await?;
         Ok(meta)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::types::{TaskMetadata, Workflow};
+    use tempfile::tempdir;
+
+    fn make_meta(id: &str, name: &str) -> TaskMetadata {
+        TaskMetadata {
+            id: id.to_string(),
+            name: name.to_string(),
+            description: String::new(),
+            targets: vec![],
+            status: 1,
+            progress: 0,
+            exit_code: 0,
+            error_message: String::new(),
+            created_at: 0,
+            updated_at: None,
+            started_at: None,
+            finished_at: None,
+            log_path: String::new(),
+            workflow: Workflow::default(),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_create_and_get_task() {
+        let dir = tempdir().unwrap();
+        let store = FileTaskStore::new(dir.path().to_path_buf());
+        let meta = make_meta("test-id", "test task");
+        store.create_task(&meta).await.unwrap();
+        let got = store.get_task("test-id").await.unwrap();
+        assert!(got.is_some());
+        assert_eq!(got.unwrap().name, "test task");
+    }
+
+    #[tokio::test]
+    async fn test_get_nonexistent_task_returns_none() {
+        let dir = tempdir().unwrap();
+        let store = FileTaskStore::new(dir.path().to_path_buf());
+        let got = store.get_task("no-such-id").await.unwrap();
+        assert!(got.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_delete_task() {
+        let dir = tempdir().unwrap();
+        let store = FileTaskStore::new(dir.path().to_path_buf());
+        let meta = make_meta("del-id", "to delete");
+        store.create_task(&meta).await.unwrap();
+        store.delete_task("del-id").await.unwrap();
+        let got = store.get_task("del-id").await.unwrap();
+        assert!(got.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_set_status() {
+        let dir = tempdir().unwrap();
+        let store = FileTaskStore::new(dir.path().to_path_buf());
+        let meta = make_meta("status-id", "status test");
+        store.create_task(&meta).await.unwrap();
+        store.set_status("status-id", 2, Some(50), None, None, None).await.unwrap();
+        let got = store.get_task("status-id").await.unwrap().unwrap();
+        assert_eq!(got.status, 2);
+        assert_eq!(got.progress, 50);
+    }
+
+    #[tokio::test]
+    async fn test_list_tasks() {
+        let dir = tempdir().unwrap();
+        let store = FileTaskStore::new(dir.path().to_path_buf());
+        store.create_task(&make_meta("id-1", "task 1")).await.unwrap();
+        store.create_task(&make_meta("id-2", "task 2")).await.unwrap();
+        let tasks = store.list_tasks().await.unwrap();
+        assert_eq!(tasks.len(), 2);
     }
 }

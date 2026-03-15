@@ -1,9 +1,9 @@
 use async_trait::async_trait;
 use std::path::PathBuf;
-use std::time::Duration;
 use tokio::sync::mpsc;
-use crate::core::types::{CommandSpec, TaskMetadata, TaskMetadataPatch, RunnerEvent};
+use crate::domain::types::{CommandSpec, TaskMetadata, TaskMetadataPatch, RunnerEvent};
 use crate::error::AppError;
+use crate::storage::task_db::PortRow;
 
 #[async_trait]
 pub trait TaskStore: Send + Sync + 'static {
@@ -26,10 +26,14 @@ pub trait CommandParser: Send + Sync + 'static {
 pub trait TaskManager: Send + Sync + 'static {
     async fn start(&self, id: &str) -> Result<i64, AppError>;
     async fn stop(&self, id: &str) -> Result<(), AppError>;
-    async fn ensure_stopped(&self, id: &str, _timeout: Duration) -> Result<(), AppError> {
-        let _ = self.stop(id).await?;
-        Ok(())
-    }
     async fn start_with_event_sink(&self, id: &str, sink: mpsc::Sender<RunnerEvent>) -> Result<i64, AppError>;
     async fn attach_event_sink(&self, id: &str, sink: mpsc::Sender<RunnerEvent>) -> Result<(), AppError>;
+}
+
+/// 目标存储库 trait，封装对 targets.db 的所有操作
+#[async_trait]
+pub trait TargetRepository: Send + Sync + 'static {
+    async fn create_targets(&self, task_id: &str, targets: &[String]) -> Result<(), AppError>;
+    async fn reset_targets(&self, task_id: &str) -> Result<(), AppError>;
+    async fn query_port_results(&self, task_id: &str) -> Result<Vec<PortRow>, AppError>;
 }

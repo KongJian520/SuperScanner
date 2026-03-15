@@ -1,6 +1,5 @@
-import React from 'react';
 import { TaskStatus } from '../types';
-import { Activity, AlertOctagon, CheckCircle2, Clock, PauseCircle, ShieldAlert, StopCircle } from 'lucide-react';
+import { AlertOctagon, CheckCircle2, Clock, PauseCircle, StopCircle } from 'lucide-react';
 
 export const TaskStatusBadge = ({ status }: { status: TaskStatus }) => {
   const styles = {

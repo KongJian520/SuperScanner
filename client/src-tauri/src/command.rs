@@ -1,11 +1,7 @@
 pub mod server_info;
 
-pub mod server_info_proto {
-    tonic::include_proto!("status.v1");
-}
+pub use super_scanner_shared::proto::status_proto as server_info_proto;
 
 pub mod tasks;
 
-pub mod tasks_proto {
-    tonic::include_proto!("tasks.v1");
-}
+pub use super_scanner_shared::proto::tasks_proto;

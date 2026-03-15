@@ -153,12 +153,27 @@ export const BackendDetail: React.FC<BackendDetailProps> = ({ backend }) => {
                     </>
                 )}
 
+                {loading && (
+                    <div className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            {[...Array(3)].map((_, i) => (
+                                <div key={i} className="h-24 rounded-lg bg-card animate-pulse" style={{ animationDelay: `${i * 100}ms` }} />
+                            ))}
+                        </div>
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            {[...Array(2)].map((_, i) => (
+                                <div key={i} className="h-32 rounded-lg bg-card animate-pulse" style={{ animationDelay: `${(i + 3) * 100}ms` }} />
+                            ))}
+                        </div>
+                    </div>
+                )}
+
                 {!info && !loading && !error && (
                     <div className="p-8 text-center text-muted-foreground border border-dashed border-border rounded-lg">
                         No server metrics available for this backend type.
                     </div>
                 )}
-                
+
                 {error && (
                     <div className="p-8 text-center text-red-400 border border-dashed border-red-900/50 rounded-lg">
                         Error loading metrics: {error.message}

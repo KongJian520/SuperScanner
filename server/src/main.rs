@@ -1,8 +1,9 @@
 use crate::config::AppConfig;
-use crate::core::traits::TaskStore;
-use crate::core::command::{CommandRegistry, PingCommand, NmapCommand, HttpxCommand, NucleiCommand, BuiltinPortScanCommand};
-use crate::proto::{server_info_svc, tasks_svc_with_store};
+use crate::domain::traits::TaskStore;
+use crate::commands::{CommandRegistry, PingCommand, NmapCommand, HttpxCommand, NucleiCommand, BuiltinPortScanCommand};
+use crate::handler::{server_info_svc, tasks_svc_with_store};
 use crate::storage::file::FileTaskStore;
+use crate::engine::scheduler::{Scheduler, SqliteScheduler};
 use crate::utils::logging;
 use crate::utils::signal::wait_for_double_ctrl_c;
 use anyhow::Context;
@@ -12,9 +13,11 @@ use tonic::transport::{Identity, Server, ServerTlsConfig};
 use tracing::{error, info};
 
 mod config;
-mod core;
+mod domain;
+mod engine;
+mod commands;
 mod error;
-mod proto;
+mod handler;
 mod storage;
 mod utils;
 
@@ -27,9 +30,9 @@ async fn main() -> anyhow::Result<()> {
             .await
             .context("无法创建根目录")?;
     }
-    
+
     let _guard = logging::init(config.root_dir.clone());
-    
+
     let addr: SocketAddr = format!("{}:{}", config.ip, config.port)
         .parse()
         .context("无法解析监听地址")?;
@@ -48,12 +51,30 @@ async fn main() -> anyhow::Result<()> {
     }
 
     // 初始化文件存储
-    let tasks_dir = config.root_dir.join("tasks");
+    let tasks_dir = config.tasks_dir;
     if !tasks_dir.exists() {
         tokio::fs::create_dir_all(&tasks_dir).await.context("无法创建任务目录")?;
     }
-    let store = FileTaskStore::new(tasks_dir);
+    let store = FileTaskStore::new(tasks_dir.clone());
     let store = Arc::new(store) as Arc<dyn TaskStore>;
+
+    // 初始化调度器
+    let scheduler = Arc::new(
+        SqliteScheduler::new(&config.root_dir)
+            .await
+            .context("无法初始化任务调度器")?
+    );
+
+    // 重启后恢复未完成任务（记录日志，暂不自动重新启动）
+    match scheduler.recover_running().await {
+        Ok(recovered) if !recovered.is_empty() => {
+            info!("检测到 {} 个未完成任务（上次运行中断），可手动重启: {:?}", recovered.len(), recovered);
+        }
+        Ok(_) => {}
+        Err(e) => {
+            error!("恢复未完成任务失败: {}", e);
+        }
+    }
 
     // 初始化命令注册表
     let registry = CommandRegistry::new()
@@ -65,7 +86,7 @@ async fn main() -> anyhow::Result<()> {
     info!("已加载命令: {:?}", registry.list_commands());
 
     server_builder
-        .add_service(tasks_svc_with_store(store, registry))
+        .add_service(tasks_svc_with_store(tasks_dir, store, registry))
         .add_service(server_info_svc())
         .serve_with_shutdown(addr, wait_for_double_ctrl_c())
         .await

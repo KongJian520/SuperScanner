@@ -16,7 +16,7 @@ pub static ROOT_DIR: Lazy<PathBuf> = Lazy::new(|| {
         }
         #[cfg(not(target_os = "windows"))]
         {
-            dirs_next::home_dir().unwrap_or_else(|| PathBuf::from("."))
+            dirs::home_dir().unwrap_or_else(|| PathBuf::from("."))
         }
     };
     base.join("scanner-projects")

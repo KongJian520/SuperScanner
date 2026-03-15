@@ -98,7 +98,11 @@ export const TasksOverview: React.FC = () => {
 
       <div className="flex-1 min-h-0">
         {isLoading ? (
-          <div className="text-sm text-muted-foreground">{t('tasks.loading')}</div>
+          <div className="space-y-2 p-1">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="h-[72px] rounded-md bg-card animate-pulse opacity-60" style={{ animationDelay: `${i * 80}ms` }} />
+            ))}
+          </div>
         ) : tasks.length === 0 ? (
           <div className="text-sm text-muted-foreground">{t('tasks.empty')}</div>
         ) : (

@@ -1,5 +1,5 @@
 [workspace]
-members = ["server","client/src-tauri"]
+members = ["server","client/src-tauri","shared"]
 resolver = "3"
 
 
@@ -25,7 +25,7 @@ thiserror = "2.0.17"
 chrono = "0.4.42"
 
 # ========== TLS / Security ==========
-rustls = "0.23.35"
+rustls = { version = "0.23.35", features = ["ring"], default-features = false }
 
 # ========== gRPC / Prost / Codegen ==========
 # prost + prost types for protobuf
@@ -38,6 +38,8 @@ tonic-prost = "0.14.2"
 tonic-prost-build = "0.14.2"
 tonic-build = { version = "0.11.0", features = ["prost"] }
 protoc-bin-vendored = "3.2.0"
+
+super-scanner-shared = { path = "shared" }
 
 # ========== Database (sqlx) ==========
 sqlx = { version = "0.8.6", features = [

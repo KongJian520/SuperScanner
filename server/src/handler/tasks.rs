@@ -1,14 +1,17 @@
-use crate::proto::tasks_proto::{
+use crate::handler::tasks_proto::{
     tasks_server, CreateTaskRequest, DeleteTaskRequest, GetTaskRequest, ListTasksRequest,
     ListTasksResponse, StartTaskRequest, StopTaskRequest, Task as ProtoTask,
-    StreamTaskEventsRequest, RestartTaskRequest, TaskEvent, LogChunk, Progress, Error as ProtoError,
+    StreamTaskEventsRequest, RestartTaskRequest, TaskEvent, Progress, Error as ProtoError,
     ScanResult,
 };
-use crate::proto::tasks_proto;
-use crate::core::traits::{TaskManager, TaskStore};
-use crate::core::runner::BackgroundTaskRunner;
-use crate::core::types::{TaskMetadata, RunnerEvent};
-use crate::core::command::CommandRegistry;
+use crate::handler::tasks_proto;
+use crate::domain::traits::{TaskManager, TaskStore};
+use crate::engine::BackgroundTaskRunner;
+use crate::engine::scheduler::SqliteScheduler;
+use crate::domain::types::{TaskMetadata, RunnerEvent};
+use crate::commands::CommandRegistry;
+use crate::storage::task_db;
+use super_scanner_shared::models::TaskStatus;
 
 use tonic::{Request, Response, Status};
 use std::sync::Arc;
@@ -20,8 +23,6 @@ use tokio_stream::wrappers::ReceiverStream;
 use ipnetwork::IpNetwork;
 use std::net::IpAddr;
 use tracing::{info, error};
-use sqlx::sqlite::{SqliteConnectOptions, SqlitePool};
-use std::str::FromStr;
 
 pub struct TasksService {
     root: PathBuf,
@@ -32,7 +33,15 @@ pub struct TasksService {
 
 impl TasksService {
     pub fn new_with_store(root: PathBuf, store: Arc<dyn TaskStore>, registry: CommandRegistry) -> Self {
-        let runner = Arc::new(BackgroundTaskRunner::new(root.clone(), store.clone(), registry.clone()));
+        // SqliteScheduler 在 main 中创建后传入；这里创建一个临时 NoopScheduler 用于接口兼容
+        // 实际生产中由 main.rs 传入 Arc<dyn Scheduler>
+        let scheduler = Arc::new(crate::engine::scheduler::NoopScheduler);
+        let runner = Arc::new(BackgroundTaskRunner::new(root.clone(), store.clone(), registry.clone(), scheduler));
+        Self { root, runner, store, registry }
+    }
+
+    pub fn new_with_scheduler(root: PathBuf, store: Arc<dyn TaskStore>, registry: CommandRegistry, scheduler: Arc<SqliteScheduler>) -> Self {
+        let runner = Arc::new(BackgroundTaskRunner::new(root.clone(), store.clone(), registry.clone(), scheduler));
         Self { root, runner, store, registry }
     }
 
@@ -63,16 +72,16 @@ impl TasksService {
     }
 }
 
-impl From<crate::core::types::Workflow> for crate::proto::tasks_proto::Workflow {
-    fn from(wf: crate::core::types::Workflow) -> Self {
+impl From<crate::domain::types::Workflow> for crate::handler::tasks_proto::Workflow {
+    fn from(wf: crate::domain::types::Workflow) -> Self {
         Self {
             steps: wf.steps.into_iter().map(|s| s.into()).collect(),
         }
     }
 }
 
-impl From<crate::core::types::WorkflowStep> for crate::proto::tasks_proto::WorkflowStep {
-    fn from(step: crate::core::types::WorkflowStep) -> Self {
+impl From<crate::domain::types::WorkflowStep> for crate::handler::tasks_proto::WorkflowStep {
+    fn from(step: crate::domain::types::WorkflowStep) -> Self {
         Self {
             r#type: step.r#type,
             tool: step.tool,
@@ -80,16 +89,16 @@ impl From<crate::core::types::WorkflowStep> for crate::proto::tasks_proto::Workf
     }
 }
 
-impl From<crate::proto::tasks_proto::Workflow> for crate::core::types::Workflow {
-    fn from(wf: crate::proto::tasks_proto::Workflow) -> Self {
+impl From<crate::handler::tasks_proto::Workflow> for crate::domain::types::Workflow {
+    fn from(wf: crate::handler::tasks_proto::Workflow) -> Self {
         Self {
             steps: wf.steps.into_iter().map(|s| s.into()).collect(),
         }
     }
 }
 
-impl From<crate::proto::tasks_proto::WorkflowStep> for crate::core::types::WorkflowStep {
-    fn from(step: crate::proto::tasks_proto::WorkflowStep) -> Self {
+impl From<crate::handler::tasks_proto::WorkflowStep> for crate::domain::types::WorkflowStep {
+    fn from(step: crate::handler::tasks_proto::WorkflowStep) -> Self {
         Self {
             r#type: step.r#type,
             tool: step.tool,
@@ -111,38 +120,23 @@ impl tasks_server::Tasks for TasksService {
         let id = request.into_inner().id;
         let task = self.store.get_task(&id).await.map_err(Status::from)?
             .ok_or_else(|| Status::not_found("任务不存在"))?;
-        
+
         let mut proto_task = Self::metadata_to_proto(task);
 
-        // Fetch results from targets.db
-        let db_path = self.root.join(&id).join("targets.db");
-        if db_path.exists() {
-             let db_url = format!("sqlite://{}", db_path.to_string_lossy());
-             if let Ok(pool) = SqlitePool::connect(&db_url).await {
-                 // Use CAST(updated_at AS TEXT) to ensure we get a string, avoiding type mapping issues
-                 if let Ok(rows) = sqlx::query("SELECT ip, port, protocol, state, service, tool, CAST(updated_at AS TEXT) as updated_at FROM port_results")
-                    .fetch_all(&pool).await 
-                 {
-                     let mut results = Vec::new();
-                     for row in rows {
-                         use sqlx::Row;
-                         // Safely handle port as i64 (SQLite INTEGER) and cast to i32
-                         let port: i64 = row.try_get("port").unwrap_or(0);
-                         
-                         results.push(ScanResult {
-                             ip: row.try_get("ip").unwrap_or_default(),
-                             port: port as i32,
-                             protocol: row.try_get("protocol").unwrap_or_default(),
-                             state: row.try_get("state").unwrap_or_default(),
-                             service: row.try_get("service").unwrap_or_default(),
-                             tool: row.try_get("tool").unwrap_or_default(),
-                             timestamp: row.try_get("updated_at").unwrap_or_default(),
-                         });
-                     }
-                     proto_task.results = results;
-                 }
-                 let _ = pool.close().await;
-             }
+        let task_dir = self.root.join(&id);
+        if let Ok(pool) = task_db::open_targets_db(&task_dir).await {
+            if let Ok(rows) = task_db::query_port_results(&pool).await {
+                proto_task.results = rows.into_iter().map(|r| ScanResult {
+                    ip: r.ip,
+                    port: r.port as i32,
+                    protocol: r.protocol,
+                    state: r.state,
+                    service: r.service,
+                    tool: r.tool,
+                    timestamp: r.timestamp,
+                }).collect();
+            }
+            let _ = pool.close().await;
         }
 
         Ok(Response::new(proto_task))
@@ -151,12 +145,10 @@ impl tasks_server::Tasks for TasksService {
     async fn create_task(&self, request: Request<CreateTaskRequest>) -> Result<Response<ProtoTask>, Status> {
         let mut req = request.into_inner();
         info!("Received create task request: {:?}", req);
-        
-        // Deduplicate targets
+
         req.targets.sort();
         req.targets.dedup();
 
-        // 验证输入
         if req.name.trim().is_empty() {
             return Err(Status::invalid_argument("任务名称不能为空"));
         }
@@ -177,13 +169,13 @@ impl tasks_server::Tasks for TasksService {
 
         let id = Uuid::new_v4().to_string();
         let now = chrono::Utc::now().timestamp_millis();
-        
+
         let meta = TaskMetadata {
             id: id.clone(),
             name: req.name,
             description: req.description,
             targets: req.targets.clone(),
-            status: 1, // PENDING
+            status: TaskStatus::Pending.as_i32(),
             exit_code: 0,
             error_message: String::new(),
             created_at: now,
@@ -197,46 +189,14 @@ impl tasks_server::Tasks for TasksService {
 
         self.store.create_task(&meta).await.map_err(Status::from)?;
         info!("Task record created in DB: {}", id);
-        
-        // Wrap file system operations
+
         let fs_result = async {
-            // 创建目录
             let task_dir = self.root.join(&id);
             tokio::fs::create_dir_all(&task_dir).await?;
 
-            // 1. 展开 IP 并初始化 SQLite
-            let mut expanded_targets = Vec::new();
-            for target in &req.targets {
-                if let Ok(net) = target.parse::<IpNetwork>() {
-                    for ip in net.iter() {
-                        expanded_targets.push(ip.to_string());
-                    }
-                } else {
-                    expanded_targets.push(target.clone());
-                }
-            }
+            task_db::create_targets_db(&task_dir, &req.targets).await
+                .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
 
-            let db_path = task_dir.join("targets.db");
-            let db_url = format!("sqlite://{}", db_path.to_string_lossy());
-            
-            let opts = SqliteConnectOptions::from_str(&db_url).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?
-                .create_if_missing(true);
-            let pool = SqlitePool::connect_with(opts).await.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
-
-            sqlx::query("CREATE TABLE IF NOT EXISTS targets (ip TEXT PRIMARY KEY, status TEXT DEFAULT 'pending', updated_at DATETIME DEFAULT CURRENT_TIMESTAMP)")
-                .execute(&pool).await.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
-
-            let mut tx = pool.begin().await.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
-            for ip in expanded_targets {
-                sqlx::query("INSERT OR IGNORE INTO targets (ip) VALUES (?)")
-                    .bind(ip)
-                    .execute(&mut *tx).await.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
-            }
-            tx.commit().await.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
-            pool.close().await;
-
-            // 2. 创建命令目录和配置
-            // 定义工作流：先 Ping 后 Curl
             let workflow = vec!["ping"];
             let commands_dir = task_dir.join("commands");
             tokio::fs::create_dir_all(&commands_dir).await?;
@@ -244,16 +204,14 @@ impl tasks_server::Tasks for TasksService {
             for cmd_id in &workflow {
                 let cmd_dir = commands_dir.join(cmd_id);
                 tokio::fs::create_dir_all(&cmd_dir).await?;
-                
+
                 if let Some(cmd) = self.registry.get(cmd_id) {
-                    // 构建 Spec 并保存
                     let spec = cmd.build_spec(&req.targets, &[]);
                     let toml_content = toml::to_string_pretty(&spec).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
                     tokio::fs::write(cmd_dir.join("spec.toml"), toml_content).await?;
                 }
             }
 
-            // 保存工作流定义
             let workflow_content = serde_json::to_string_pretty(&workflow).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
             tokio::fs::write(task_dir.join("workflow.json"), workflow_content).await?;
 
@@ -272,25 +230,23 @@ impl tasks_server::Tasks for TasksService {
 
     async fn start_task(&self, request: Request<StartTaskRequest>) -> Result<Response<ProtoTask>, Status> {
         let id = request.into_inner().id;
-        
+
         let task = self.store.get_task(&id).await.map_err(Status::from)?
             .ok_or_else(|| Status::not_found("任务未找到"))?;
 
-        // 限制：如果任务已完成或正在运行，不允许重复启动（除非显式重启）
-        // 2=RUNNING, 3=DONE
-        if task.status == 2 {
+        if task.status == TaskStatus::Running.as_i32() {
             return Err(Status::failed_precondition("任务正在运行中"));
         }
-        if task.status == 3 {
+        if task.status == TaskStatus::Done.as_i32() {
             return Err(Status::failed_precondition("任务已完成，请使用重启功能"));
         }
 
         info!("Starting task: {}", id);
         self.runner.start(&id).await.map_err(Status::from)?;
-        
+
         let task = self.store.get_task(&id).await.map_err(Status::from)?
             .ok_or_else(|| Status::not_found("任务未找到"))?;
-        
+
         Ok(Response::new(Self::metadata_to_proto(task)))
     }
 
@@ -298,10 +254,10 @@ impl tasks_server::Tasks for TasksService {
         let id = request.into_inner().id;
         info!("Stopping task: {}", id);
         self.runner.stop(&id).await.map_err(Status::from)?;
-        
+
         let task = self.store.get_task(&id).await.map_err(Status::from)?
             .ok_or_else(|| Status::not_found("任务未找到"))?;
-            
+
         Ok(Response::new(Self::metadata_to_proto(task)))
     }
 
@@ -318,20 +274,15 @@ impl tasks_server::Tasks for TasksService {
         let (tx, rx) = mpsc::channel(100);
         let (runner_tx, mut runner_rx) = mpsc::channel(100);
 
-        // 如果请求启动且未运行，则启动
         if req.start_if_not_running {
-            // 尝试启动，忽略"已在运行"错误
             let _ = self.runner.start_with_event_sink(&id, runner_tx.clone()).await;
         }
 
-        // 尝试附加到现有任务
-        if let Err(_) = self.runner.attach_event_sink(&id, runner_tx).await {
-            // 如果任务未运行且我们没有启动它（或者启动失败但不是因为已运行），
-            // 我们仍然会尝试从日志文件回放历史日志并 tail
+        if self.runner.attach_event_sink(&id, runner_tx).await.is_err() {
+            // task not running; events may be empty
         }
 
         tokio::spawn(async move {
-            // 将来自 runner 的实时事件转发给客户端
             while let Some(event) = runner_rx.recv().await {
                 let proto_event = match event {
                     RunnerEvent::Progress { percent, ts } => TaskEvent {
@@ -341,8 +292,8 @@ impl tasks_server::Tasks for TasksService {
                             ts: TasksService::to_proto_ts(Some(ts)),
                         })),
                     },
-                    RunnerEvent::Log { .. } => continue, // 忽略日志事件
-                    RunnerEvent::Exit { .. } => continue, // Exit 事件由 snapshot 或状态更新处理
+                    RunnerEvent::Log { .. } => continue,
+                    RunnerEvent::Exit { .. } => continue,
                     RunnerEvent::Snapshot { meta, .. } => TaskEvent {
                         ev: Some(tasks_proto::task_event::Ev::TaskSnapshot(TasksService::metadata_to_proto(meta))),
                     },
@@ -352,11 +303,10 @@ impl tasks_server::Tasks for TasksService {
                 };
 
                 if tx.send(Ok(proto_event)).await.is_err() {
-                    return; // 客户端已断开
+                    return;
                 }
             }
         });
-        
 
         Ok(Response::new(ReceiverStream::new(rx)))
     }
@@ -364,11 +314,9 @@ impl tasks_server::Tasks for TasksService {
     async fn restart_task(&self, request: Request<RestartTaskRequest>) -> Result<Response<ProtoTask>, Status> {
         let req = request.into_inner();
         let id = req.id;
-        
-        // 1. 检查任务是否正在运行
+
         if let Ok(Some(current_task)) = self.store.get_task(&id).await {
-            // 2 = RUNNING
-            if current_task.status == 2 {
+            if current_task.status == TaskStatus::Running.as_i32() {
                 return Err(Status::failed_precondition("任务正在运行中，请先停止任务后再重启"));
             }
         } else {
@@ -376,29 +324,11 @@ impl tasks_server::Tasks for TasksService {
         }
 
         let now = chrono::Utc::now().timestamp_millis();
-        
-        // 2. 重置元数据
         let task = self.store.reset_task_for_restart(&id, now).await.map_err(Status::from)?;
-        
-        // 3. 重置 targets.db 中的目标状态
+
         let task_dir = self.root.join(&id);
-        let db_path = task_dir.join("targets.db");
-        if db_path.exists() {
-            let db_url = format!("sqlite://{}", db_path.to_string_lossy());
-            match SqlitePool::connect(&db_url).await {
-                Ok(pool) => {
-                    if let Err(e) = sqlx::query("UPDATE targets SET status = 'pending'")
-                        .execute(&pool).await 
-                    {
-                        error!("Failed to reset targets.db for task {}: {}", id, e);
-                        // 这里可以选择是否报错返回，或者仅记录日志继续
-                    }
-                    pool.close().await;
-                },
-                Err(e) => {
-                    error!("Failed to connect to targets.db for task {}: {}", id, e);
-                }
-            }
+        if let Err(e) = task_db::reset_targets_db(&task_dir).await {
+            error!("Failed to reset targets.db for task {}: {}", id, e);
         }
 
         if req.start_now {

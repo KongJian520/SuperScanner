@@ -2,3 +2,6 @@
 .idea
 scanner-projects
 .sqlx
+.claude
+.DS_Store
+.sisyphus

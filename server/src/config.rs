@@ -1,6 +1,23 @@
 use clap::Parser;
-use std::path::PathBuf;
-use crate::utils::ROOT_DIR;
+use once_cell::sync::Lazy;
+use std::{env, path::PathBuf};
+
+// 全局根目录，由环境变量 SUPERSCANNER_HOMEDIR 控制，默认为当前目录/home 下的 scanner-projects
+pub static ROOT_DIR: Lazy<PathBuf> = Lazy::new(|| {
+    let base = if let Ok(env_dir) = env::var("SUPERSCANNER_HOMEDIR") {
+        PathBuf::from(env_dir)
+    } else {
+        #[cfg(target_os = "windows")]
+        {
+            env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            dirs_next::home_dir().unwrap_or_else(|| PathBuf::from("."))
+        }
+    };
+    base.join("scanner-projects")
+});
 
 #[derive(Parser, Debug)]
 #[command(about = "SuperScanner gRPC 服务端", long_about = None)]
@@ -24,9 +41,7 @@ pub struct AppConfig {
     pub port: u16,
     pub tls: bool,
     pub root_dir: PathBuf,
-    pub db_path: PathBuf,
     pub certs_dir: PathBuf,
-    #[allow(dead_code)]
     pub tasks_dir: PathBuf,
 }
 
@@ -38,7 +53,6 @@ impl AppConfig {
             port: args.port,
             tls: args.tls,
             root_dir: ROOT_DIR.clone(),
-            db_path: ROOT_DIR.join("tasks.db"),
             certs_dir: ROOT_DIR.join("crts"),
             tasks_dir: ROOT_DIR.join("tasks"),
         }

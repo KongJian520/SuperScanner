@@ -268,6 +268,7 @@ export async function restartScan(address: string, id: string, useTls?: boolean)
             finishedAt: finishedRaw ? Date.parse(finishedRaw) : undefined,
             progress: taskDto?.progress ?? 0,
             workflow: taskDto?.workflow ?? { steps: [] },
+            results: taskDto?.results ?? [],
         };
 
         console.log('[API] restartScan success:', task);

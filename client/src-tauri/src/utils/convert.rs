@@ -98,3 +98,67 @@ pub fn task_event_from_proto(p: tasks_proto::TaskEvent) -> Option<TaskEventDto> 
         None => None,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::command::tasks_proto;
+
+    #[test]
+    fn test_task_from_proto_empty_description_becomes_none() {
+        let proto = tasks_proto::Task {
+            id: "abc".to_string(),
+            name: "test".to_string(),
+            description: "".to_string(),
+            targets: vec![],
+            status: 1,
+            exit_code: 0,
+            error_message: "".to_string(),
+            created_at: None,
+            updated_at: None,
+            started_at: None,
+            finished_at: None,
+            progress: 0,
+            workflow: None,
+            results: vec![],
+        };
+        let dto = task_from_proto(proto);
+        assert!(dto.description.is_none());
+    }
+
+    #[test]
+    fn test_task_from_proto_nonempty_description_is_some() {
+        let proto = tasks_proto::Task {
+            id: "xyz".to_string(),
+            name: "test".to_string(),
+            description: "some desc".to_string(),
+            targets: vec![],
+            status: 1,
+            exit_code: 0,
+            error_message: "".to_string(),
+            created_at: None,
+            updated_at: None,
+            started_at: None,
+            finished_at: None,
+            progress: 0,
+            workflow: None,
+            results: vec![],
+        };
+        let dto = task_from_proto(proto);
+        assert_eq!(dto.description, Some("some desc".to_string()));
+    }
+
+    #[test]
+    fn test_ts_to_rfc3339_none_on_none_input() {
+        let result = ts_to_rfc3339(None);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_ts_to_rfc3339_valid_timestamp() {
+        let ts = prost_types::Timestamp { seconds: 0, nanos: 0 };
+        let result = ts_to_rfc3339(Some(ts));
+        assert!(result.is_some());
+        assert!(result.unwrap().contains("1970"));
+    }
+}

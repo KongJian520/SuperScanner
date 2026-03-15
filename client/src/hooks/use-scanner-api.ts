@@ -151,7 +151,7 @@ export function useTaskEvents(backendId: string | null, taskId: string | null) {
   useEffect(() => {
     if (!backend?.address || !taskId) return;
 
-    let localRemoved = false;
+    let _localRemoved = false;
 
     const startListening = async () => {
       const myListenerInstance = ++__listenerInstanceCounter;
@@ -170,7 +170,7 @@ export function useTaskEvents(backendId: string | null, taskId: string | null) {
 
       // Start the stream on the backend (spawn background tauri task that emits events)
       try {
-        await api.streamTaskEvents(backend.address, taskId, !!backend.useTls);
+        await api.streamTaskEvents(backend.address!, taskId, !!backend.useTls);
         console.log('[Hooks] useTaskEvents streamTaskEvents started', { taskId, listenerInstance: myListenerInstance });
       } catch (e) {
         // stream start failed; cleanup reservation

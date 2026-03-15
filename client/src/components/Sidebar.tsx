@@ -14,6 +14,7 @@ import {
     StopCircle,
     Trash2
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { TaskStatus } from '../types';
 import { useNavigate, useLocation, useMatch } from 'react-router-dom';
 import { useAppStore } from '../lib/store';
@@ -102,21 +103,45 @@ export const Sidebar: React.FC = () => {
       {/* Sidebar Mode Tabs */}
       <div className={`flex ${isSidebarOpen ? 'flex-row' : 'flex-col'} items-center p-2 gap-1 border-b border-border`}>
         <button
-          onClick={() => navigate('/tasks')}
-          title={t('sidebar.tasks')}
-          className={`flex-1 flex items-center justify-center gap-2 py-1.5 text-xs font-medium rounded-md transition-colors w-full ${tab === 'tasks' ? 'bg-secondary text-white' : 'text-muted-foreground hover:bg-white/5'}`}
-        >
-          <List size={14} />
-          {isSidebarOpen && <span>{t('sidebar.tasks')}</span>}
-        </button>
-        <button
-          onClick={() => navigate('/servers')}
-          title={t('sidebar.backends')}
-          className={`flex-1 flex items-center justify-center gap-2 py-1.5 text-xs font-medium rounded-md transition-colors w-full ${tab === 'backends' ? 'bg-secondary text-white' : 'text-muted-foreground hover:bg-white/5'}`}
-        >
-          <Server size={14} />
-          {isSidebarOpen && <span>{t('sidebar.backends')}</span>}
-        </button>
+            onClick={() => navigate('/tasks')}
+            title={t('sidebar.tasks')}
+            className={`flex-1 flex items-center justify-center gap-2 py-1.5 text-xs font-medium rounded-md transition-colors w-full active:scale-95 ${tab === 'tasks' ? 'bg-secondary text-white' : 'text-muted-foreground hover:bg-white/5'}`}
+          >
+            <List size={14} />
+            <AnimatePresence>
+              {isSidebarOpen && (
+                <motion.span
+                  initial={{ opacity: 0, width: 0 }}
+                  animate={{ opacity: 1, width: 'auto' }}
+                  exit={{ opacity: 0, width: 0 }}
+                  transition={{ duration: 0.18 }}
+                  className="overflow-hidden whitespace-nowrap"
+                >
+                  {t('sidebar.tasks')}
+                </motion.span>
+              )}
+            </AnimatePresence>
+          </button>
+          <button
+            onClick={() => navigate('/servers')}
+            title={t('sidebar.backends')}
+            className={`flex-1 flex items-center justify-center gap-2 py-1.5 text-xs font-medium rounded-md transition-colors w-full active:scale-95 ${tab === 'backends' ? 'bg-secondary text-white' : 'text-muted-foreground hover:bg-white/5'}`}
+          >
+            <Server size={14} />
+            <AnimatePresence>
+              {isSidebarOpen && (
+                <motion.span
+                  initial={{ opacity: 0, width: 0 }}
+                  animate={{ opacity: 1, width: 'auto' }}
+                  exit={{ opacity: 0, width: 0 }}
+                  transition={{ duration: 0.18 }}
+                  className="overflow-hidden whitespace-nowrap"
+                >
+                  {t('sidebar.backends')}
+                </motion.span>
+              )}
+            </AnimatePresence>
+          </button>
       </div>
 
       {/* Action Area */}
@@ -125,7 +150,7 @@ export const Sidebar: React.FC = () => {
           <button
             onClick={handleNewTask}
             title={t('sidebar.new_task')}
-            className={`w-full flex items-center justify-center gap-2 bg-white text-black hover:bg-gray-200 transition-colors py-2 px-4 rounded-md text-sm font-semibold shadow-sm`}
+            className={`w-full flex items-center justify-center gap-2 bg-white text-black hover:bg-gray-200 transition-colors py-2 px-4 rounded-md text-sm font-semibold shadow-sm active:scale-95`}
           >
             <Plus size={16} />
             {isSidebarOpen && <span>{t('sidebar.new_task')}</span>}
@@ -134,7 +159,7 @@ export const Sidebar: React.FC = () => {
           <button
             onClick={handleNewBackend}
             title={t('sidebar.add_backend')}
-            className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white hover:bg-blue-500 transition-colors py-2 px-4 rounded-md text-sm font-semibold shadow-sm"
+            className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white hover:bg-blue-500 transition-colors py-2 px-4 rounded-md text-sm font-semibold shadow-sm active:scale-95"
           >
             <Plus size={16} />
             {isSidebarOpen && <span>{t('sidebar.add_backend')}</span>}

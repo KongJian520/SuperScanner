@@ -2,7 +2,7 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { Task, TaskStatus } from '../types';
 import { toast } from 'sonner';
-import { AlertOctagon, CheckCircle2, Clock, Download, Info, PauseCircle, Play, Square, StopCircle } from 'lucide-react';
+import { AlertOctagon, Clock, Info, Play, Square } from 'lucide-react';
 import { useStartTask, useStopTask, useBackends } from '../hooks/use-scanner-api';
 import * as api from '../lib/api';
 
@@ -98,23 +98,22 @@ export const TaskDetail: React.FC<TaskDetailProps> = ({ task }) => {
         </div>
 
         <div className="flex gap-2 relative z-10 ml-4">
-          {/* Start button: shown when PENDING or PAUSED */}
           {(task.status === TaskStatus.PENDING || task.status === TaskStatus.PAUSED) && (
-            <button onClick={handleStart} disabled={isToggling} title={isToggling ? t('task_detail.processing') : ''} className="flex items-center gap-2 px-4 py-2 bg-white text-black text-sm font-semibold rounded-md hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-              <Play size={16} fill="currentColor" /> {t('task_detail.start')}
+            <button onClick={handleStart} disabled={isToggling} title={isToggling ? t('task_detail.processing') : ''} className="flex items-center gap-2 px-4 py-2 bg-white text-black text-sm font-semibold rounded-md hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed active:scale-95">
+              {isStarting ? <span className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" /> : <Play size={16} fill="currentColor" />}
+              {t('task_detail.start')}
             </button>
           )}
 
-          {/* Stop button: shown when RUNNING */}
           {task.status === TaskStatus.RUNNING && (
-            <button onClick={handleStop} disabled={isToggling} title={isToggling ? t('task_detail.processing') : ''} className="flex items-center gap-2 px-4 py-2 bg-red-900/50 text-red-200 border border-red-900 text-sm font-semibold rounded-md hover:bg-red-900 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-              <Square size={16} fill="currentColor" /> {t('task_detail.stop')}
+            <button onClick={handleStop} disabled={isToggling} title={isToggling ? t('task_detail.processing') : ''} className="flex items-center gap-2 px-4 py-2 bg-red-900/50 text-red-200 border border-red-900 text-sm font-semibold rounded-md hover:bg-red-900 transition-colors disabled:opacity-50 disabled:cursor-not-allowed active:scale-95">
+              {isStopping ? <span className="w-4 h-4 border-2 border-red-200/30 border-t-red-200 rounded-full animate-spin" /> : <Square size={16} fill="currentColor" />}
+              {t('task_detail.stop')}
             </button>
           )}
 
-          {/* Restart button: only when DONE */}
           {(task.status === TaskStatus.DONE || task.status === TaskStatus.FAILED) && (
-            <button onClick={handleRestart} disabled={isToggling} title={isToggling ? t('task_detail.processing') : t('task_detail.restart')} className="flex items-center gap-2 px-4 py-2 bg-white text-black text-sm font-semibold rounded-md hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+            <button onClick={handleRestart} disabled={isToggling} title={isToggling ? t('task_detail.processing') : t('task_detail.restart')} className="flex items-center gap-2 px-4 py-2 bg-white text-black text-sm font-semibold rounded-md hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed active:scale-95">
               <Play size={16} fill="currentColor" /> {t('task_detail.restart')}
             </button>
           )}
