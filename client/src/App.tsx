@@ -1,8 +1,11 @@
-import React from 'react';
+import React, { useEffect } from 'react';
+import { useHotkeys } from 'react-hotkeys-hook';
 import { Titlebar } from './components/Titlebar';
-import { Sidebar } from './components/Sidebar';
+import { ActivityBar } from './components/ActivityBar';
+import { SidebarPanel } from './components/SidebarPanel';
+import { BottomNav } from './components/BottomNav';
 import './App.css';
-import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import TasksOverview from './views/TasksOverview';
 import ServersOverview from './views/ServersOverview';
@@ -10,6 +13,8 @@ import CreateTaskDialog from './components/CreateTaskDialog';
 import TaskDetailRoute from './routes/TaskDetailRoute';
 import ServerDetailRoute from './routes/ServerDetailRoute';
 import NewBackendDialog from './components/NewBackendDialog';
+import { useAppStore } from './lib/store';
+import { isMac } from './lib/platform';
 
 const pageVariants = {
   initial: { opacity: 0, y: 6 },
@@ -31,15 +36,41 @@ const PageWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
 
 const App: React.FC = () => {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { setActiveTab, setSidebarOpen, isSidebarOpen } = useAppStore();
+
+  useEffect(() => {
+    const path = location.pathname;
+    if (path.startsWith('/servers') || path.startsWith('/server')) {
+      setActiveTab('servers');
+    } else {
+      setActiveTab('tasks');
+    }
+  }, [location.pathname, setActiveTab]);
+
+  // 修饰键跟随系统：macOS 用 meta，Windows/Linux 用 ctrl
+  const mod = isMac ? 'meta' : 'ctrl';
+
+  // ⌘1 / Ctrl+1 → Tasks
+  useHotkeys(`${mod}+1`, () => { setActiveTab('tasks'); navigate('/tasks'); }, { preventDefault: true });
+  // ⌘2 / Ctrl+2 → Servers
+  useHotkeys(`${mod}+2`, () => { setActiveTab('servers'); navigate('/servers'); }, { preventDefault: true });
+  // ⌘N / Ctrl+N → New Task
+  useHotkeys(`${mod}+n`, () => navigate('/tasks/new'), { preventDefault: true });
+  // ⌘⇧N / Ctrl+Shift+N → Add Server
+  useHotkeys(`${mod}+shift+n`, () => navigate('/servers/new'), { preventDefault: true });
+  // ⌘B / Ctrl+B → Toggle Sidebar
+  useHotkeys(`${mod}+b`, () => setSidebarOpen(!isSidebarOpen), { preventDefault: true });
 
   return (
     <div className="flex flex-col h-screen bg-background text-foreground overflow-hidden font-sans selection:bg-blue-500/30">
       <Titlebar />
 
       <div className="flex flex-1 overflow-hidden">
-        <Sidebar />
+        <ActivityBar />
+        <SidebarPanel />
 
-        <main className="flex-1 bg-zinc-950 relative overflow-hidden flex flex-col">
+        <main className="flex-1 bg-background relative overflow-hidden flex flex-col pb-14 md:pb-0">
           <AnimatePresence mode="wait" initial={false}>
             <Routes location={location} key={location.pathname}>
               <Route path="/" element={<Navigate to="/tasks" replace />} />
@@ -53,6 +84,8 @@ const App: React.FC = () => {
           </AnimatePresence>
         </main>
       </div>
+
+      <BottomNav />
     </div>
   );
 };

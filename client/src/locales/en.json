@@ -7,7 +7,9 @@
     "delete": "Delete",
     "edit": "Edit",
     "create": "Create",
-    "confirm": "Confirm"
+    "confirm": "Confirm",
+    "no_data": "No data",
+    "no_address": "No address"
   },
   "sidebar": {
     "tasks": "Tasks",
@@ -70,6 +72,7 @@
     "start": "Start",
     "stop": "Stop",
     "restart": "Restart",
+    "restart_success": "Task restarted",
     "processing": "Processing...",
     "targets": "Targets",
     "exit_code": "Exit Code: {{code}}",
@@ -79,7 +82,12 @@
     "scan_results": "Scan Results",
     "results_placeholder": "Results will appear here after completion.",
     "export_report": "Export Report",
-    "error_restart_no_targets": "Cannot restart: no targets found"
+    "error_restart_no_targets": "Cannot restart: no targets found",
+    "no_results": "No scan results yet",
+    "stat_assets": "Assets",
+    "stat_ports": "Ports",
+    "stat_services": "Services",
+    "stat_vulns": "Vulns"
   },
   "backend_detail": {
     "refresh_metrics": "Refresh Metrics",
@@ -90,6 +98,52 @@
     "cores_available": "{{count}} Cores Available",
     "memory_usage": "Memory Usage",
     "disk_usage": "Disk Usage",
-    "unknown": "unknown"
+    "unknown": "unknown",
+    "no_metrics": "No server metrics available for this backend type.",
+    "error_metrics": "Error loading metrics: {{message}}",
+    "used": "Used",
+    "total": "Total"
+  },
+  "servers": {
+    "title": "Servers",
+    "add": "+ Add",
+    "no_backends": "No backends configured.",
+    "delete": "Delete",
+    "no_address": "No address"
+  },
+  "dashboard": {
+    "assets": "Assets",
+    "alive_ips": "Alive IPs",
+    "ports": "Ports",
+    "vulns": "Vulns",
+    "protocol_dist": "Protocol Dist.",
+    "service_types": "Service Types",
+    "port_dist": "Port Dist.",
+    "software_vendors": "Vendors",
+    "asset_types": "Asset Types",
+    "ip_list": "IP List",
+    "port_rank": "Port Rank",
+    "no_data": "No data",
+    "services_detected": "{{count}} distinct services detected",
+    "active": "Active",
+    "no_vuln_data": "No vulnerability data"
+  },
+  "menu": {
+    "file": "File",
+    "new_task": "New Task",
+    "add_server": "Add Server",
+    "close_window": "Close Window",
+    "view": "View",
+    "tasks": "Tasks",
+    "servers": "Servers",
+    "help": "Help",
+    "about": "About PolyScan Pro"
+  },
+  "activity_bar": {
+    "tasks": "Tasks",
+    "servers": "Servers",
+    "light_mode": "Light Mode",
+    "dark_mode": "Dark Mode",
+    "settings": "Settings"
   }
 }

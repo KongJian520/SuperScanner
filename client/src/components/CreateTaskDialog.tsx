@@ -131,7 +131,7 @@ export const CreateTaskDialog: React.FC = () => {
                             id="scan-port" 
                             checked={portScanEnabled} 
                             onChange={e => setPortScanEnabled(e.target.checked)}
-                            className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                        className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
                         />
                         <Label htmlFor="scan-port" className="font-semibold">Port Scan</Label>
                     </div>
@@ -149,7 +149,7 @@ export const CreateTaskDialog: React.FC = () => {
                                                 setPortScanTools(portScanTools.filter(t => t !== tool));
                                             }
                                         }}
-                                        className="h-3 w-3 rounded border-gray-300"
+                                        className="h-3 w-3 rounded border-border"
                                     />
                                     {tool === 'builtin' ? 'Builtin' : 'Nmap'}
                                 </label>
@@ -165,7 +165,7 @@ export const CreateTaskDialog: React.FC = () => {
                             id="scan-fingerprint" 
                             checked={fingerprintEnabled} 
                             onChange={e => setFingerprintEnabled(e.target.checked)}
-                            className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                        className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
                         />
                         <Label htmlFor="scan-fingerprint" className="font-semibold">Fingerprint</Label>
                     </div>
@@ -183,7 +183,7 @@ export const CreateTaskDialog: React.FC = () => {
                                                 setFingerprintTools(fingerprintTools.filter(t => t !== tool));
                                             }
                                         }}
-                                        className="h-3 w-3 rounded border-gray-300"
+                                        className="h-3 w-3 rounded border-border"
                                     />
                                     {tool === 'builtin' ? 'Builtin' : 'HTTPX'}
                                 </label>
@@ -199,7 +199,7 @@ export const CreateTaskDialog: React.FC = () => {
                             id="scan-poc" 
                             checked={pocEnabled} 
                             onChange={e => setPocEnabled(e.target.checked)}
-                            className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                        className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
                         />
                         <Label htmlFor="scan-poc" className="font-semibold">POC Verify</Label>
                     </div>
@@ -217,7 +217,7 @@ export const CreateTaskDialog: React.FC = () => {
                                                 setPocTools(pocTools.filter(t => t !== tool));
                                             }
                                         }}
-                                        className="h-3 w-3 rounded border-gray-300"
+                                        className="h-3 w-3 rounded border-border"
                                     />
                                     {tool === 'builtin' ? 'Builtin' : 'Nuclei'}
                                 </label>

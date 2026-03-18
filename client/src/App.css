@@ -1,7 +1,11 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-@custom-variant dark (&:is(.dark *));
+.bottom-nav {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+@custom-variant dark (&:is(.dark *), .dark &);
 
 @theme inline {
   --radius-sm: calc(var(--radius) - 4px);

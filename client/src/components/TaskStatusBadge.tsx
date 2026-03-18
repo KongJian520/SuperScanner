@@ -3,8 +3,8 @@ import { AlertOctagon, CheckCircle2, Clock, PauseCircle, StopCircle } from 'luci
 
 export const TaskStatusBadge = ({ status }: { status: TaskStatus }) => {
   const styles = {
-    [TaskStatus.UNSPECIFIED]: 'bg-gray-800 text-gray-500 border-gray-700',
-    [TaskStatus.PENDING]: 'bg-gray-800 text-gray-300 border-gray-700',
+    [TaskStatus.UNSPECIFIED]: 'bg-muted text-muted-foreground border-border',
+    [TaskStatus.PENDING]: 'bg-muted text-muted-foreground border-border',
     [TaskStatus.RUNNING]: 'bg-blue-900/30 text-blue-300 border-blue-800 animate-pulse',
     [TaskStatus.DONE]: 'bg-green-900/30 text-green-300 border-green-800',
     [TaskStatus.FAILED]: 'bg-red-900/30 text-red-300 border-red-800',

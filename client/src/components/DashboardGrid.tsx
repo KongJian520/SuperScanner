@@ -1,4 +1,5 @@
 import React, { useMemo, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
 import {
   PieChart, Pie, Cell, ResponsiveContainer,
@@ -59,7 +60,7 @@ const StatCard: React.FC<{ title: string; value: number; icon: React.ReactNode; 
       </div>
       <div className="relative z-10 flex flex-col gap-1">
         <p className="text-white/80 text-sm font-medium tracking-wide uppercase">{title}</p>
-        <p className="text-4xl font-black text-white">{displayValue}</p>
+        <p className="text-4xl font-black text-white tabular-nums">{displayValue}</p>
       </div>
     </motion.div>
   );
@@ -73,19 +74,18 @@ const ChartCard: React.FC<{
   delay?: number;
 }> = ({ title, icon, children, verified = true, delay = 0 }) => (
   <motion.div
-    className="bg-[#18181b] rounded-xl border border-zinc-800/50 flex flex-col h-[320px]"
+    className="bg-card rounded-xl border border-border flex flex-col h-[320px]"
     initial={{ opacity: 0, y: 12 }}
     animate={{ opacity: 1, y: 0 }}
     transition={{ duration: 0.25, ease: 'easeOut', delay }}
-    whileHover={{ borderColor: 'rgba(99,102,241,0.35)' }}
   >
-    <div className="p-4 flex items-center justify-between border-b border-zinc-800/50">
+    <div className="p-4 flex items-center justify-between border-b border-border">
       <div className="flex items-center gap-2">
         <span className="text-blue-500">{icon}</span>
-        <span className="font-semibold text-sm">{title}</span>
+        <span className="font-semibold text-sm text-foreground">{title}</span>
         {verified && <CheckCircle2 size={14} className="text-green-500/80" />}
       </div>
-      <ChevronRight size={16} className="text-zinc-600 cursor-pointer hover:text-zinc-400 transition-colors" />
+      <ChevronRight size={16} className="text-muted-foreground cursor-pointer hover:text-foreground transition-colors" />
     </div>
     <div className="flex-1 p-4 flex items-center justify-center overflow-hidden">
       {children}
@@ -98,6 +98,7 @@ interface DashboardGridProps {
 }
 
 const DashboardGrid: React.FC<DashboardGridProps> = ({ results = [] }) => {
+  const { t } = useTranslation();
   const chartColors = [COLORS.blue, COLORS.purple, COLORS.green, COLORS.yellow, COLORS.red];
 
   const stats = useMemo(() => {
@@ -149,17 +150,17 @@ const DashboardGrid: React.FC<DashboardGridProps> = ({ results = [] }) => {
     <div className="space-y-6">
       {/* Top Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard title="资产" value={stats.uniqueIps} icon={<Layers size={80} />} color="blue" />
-        <StatCard title="存活IP" value={stats.uniqueIps} icon={<Globe size={80} />} color="green" />
-        <StatCard title="端口" value={stats.totalPorts} icon={<Terminal size={80} />} color="purple" />
-        <StatCard title="漏洞" value={0} icon={<ShieldAlert size={80} />} color="red" />
+        <StatCard title={t('dashboard.assets')} value={stats.uniqueIps} icon={<Layers size={80} />} color="blue" />
+        <StatCard title={t('dashboard.alive_ips')} value={stats.uniqueIps} icon={<Globe size={80} />} color="green" />
+        <StatCard title={t('dashboard.ports')} value={stats.totalPorts} icon={<Terminal size={80} />} color="purple" />
+        <StatCard title={t('dashboard.vulns')} value={0} icon={<ShieldAlert size={80} />} color="red" />
       </div>
 
       {/* Main Grid of Details */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
         
         {/* Protocol Distribution (reusing Hardware card slot) */}
-        <ChartCard title="协议分布" icon={<Cpu size={16} />} delay={0.05}>
+        <ChartCard title={t('dashboard.protocol_dist')} icon={<Cpu size={16} />} delay={0.05}>
           {stats.protocols.length > 0 ? (
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
@@ -176,46 +177,46 @@ const DashboardGrid: React.FC<DashboardGridProps> = ({ results = [] }) => {
                     <Cell key={`cell-${index}`} fill={chartColors[index % chartColors.length]} />
                   ))}
                 </Pie>
-                <Tooltip 
-                  contentStyle={{ backgroundColor: '#18181b', border: '1px solid #27272a', borderRadius: '8px' }}
-                  itemStyle={{ color: '#e4e4e7' }}
+                <Tooltip
+                  contentStyle={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: '8px' }}
+                  itemStyle={{ color: 'var(--foreground)' }}
                 />
               </PieChart>
             </ResponsiveContainer>
           ) : (
-            <div className="text-zinc-500 text-sm">暂无数据</div>
+            <div className="text-muted-foreground text-sm">{t('dashboard.no_data')}</div>
           )}
         </ChartCard>
 
         {/* Service Distribution List */}
-        <ChartCard title="服务类型" icon={<Monitor size={16} />} delay={0.1}>
+        <ChartCard title={t('dashboard.service_types')} icon={<Monitor size={16} />} delay={0.1}>
           <div className="w-full flex flex-col gap-3 px-2 overflow-y-auto max-h-full">
             {stats.topServices.map((item, idx) => (
               <div key={idx} className="space-y-1">
                 <div className="flex justify-between text-xs font-medium">
-                  <span className="text-zinc-400">{item.name}</span>
-                  <span className="text-zinc-500">{item.value}</span>
+                  <span className="text-muted-foreground">{item.name}</span>
+                  <span className="text-muted-foreground">{item.value}</span>
                 </div>
-                <div className="h-1.5 w-full bg-zinc-800 rounded-full overflow-hidden">
-                  <div 
+                <div className="h-1.5 w-full bg-secondary rounded-full overflow-hidden">
+                  <div
                     className="h-full bg-blue-500 rounded-full transition-all duration-1000"
                     style={{ width: `${(item.value / stats.totalPorts) * 100}%` }}
                   ></div>
                 </div>
               </div>
             ))}
-            {stats.topServices.length === 0 && <div className="text-zinc-500 text-sm text-center mt-10">暂无数据</div>}
+            {stats.topServices.length === 0 && <div className="text-muted-foreground text-sm text-center mt-10">{t('dashboard.no_data')}</div>}
           </div>
         </ChartCard>
 
         {/* Top Ports Bar Chart */}
-        <ChartCard title="端口分布" icon={<Terminal size={16} />} delay={0.15}>
+        <ChartCard title={t('dashboard.port_dist')} icon={<Terminal size={16} />} delay={0.15}>
            <ResponsiveContainer width="100%" height="100%">
             <BarChart data={stats.topPorts}>
-              <XAxis dataKey="name" stroke="#52525b" fontSize={10} tickLine={false} axisLine={false} />
-              <Tooltip 
-                cursor={{ fill: '#27272a' }}
-                contentStyle={{ backgroundColor: '#18181b', border: '1px solid #27272a', borderRadius: '8px' }}
+              <XAxis dataKey="name" stroke="var(--muted-foreground)" fontSize={10} tickLine={false} axisLine={false} />
+              <Tooltip
+                cursor={{ fill: 'var(--accent)' }}
+                contentStyle={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: '8px' }}
               />
               <Bar dataKey="value" fill={COLORS.purple} radius={[4, 4, 0, 0]} />
             </BarChart>
@@ -223,17 +224,17 @@ const DashboardGrid: React.FC<DashboardGridProps> = ({ results = [] }) => {
         </ChartCard>
 
         {/* Software Vendors (Placeholder for now, maybe map services to vendors later) */}
-        <ChartCard title="软件厂商" icon={<Server size={16} />} delay={0.2}>
+        <ChartCard title={t('dashboard.software_vendors')} icon={<Server size={16} />} delay={0.2}>
           <div className="flex flex-col items-center justify-center text-center gap-3">
-             <div className="w-20 h-20 rounded-full border-4 border-zinc-800 flex items-center justify-center">
-                <span className="text-xl font-bold">{stats.topServices.length}</span>
+             <div className="w-20 h-20 rounded-full border-4 border-border flex items-center justify-center">
+                <span className="text-xl font-bold text-foreground">{stats.topServices.length}</span>
              </div>
-             <p className="text-xs text-zinc-500 max-w-[150px]">共检测到 {stats.topServices.length} 种不同的服务</p>
+             <p className="text-xs text-muted-foreground max-w-[150px]">{t('dashboard.services_detected', { count: stats.topServices.length })}</p>
           </div>
         </ChartCard>
 
         {/* Asset Types (Placeholder - reusing protocol or just static for now) */}
-        <ChartCard title="资产类型" icon={<Layers size={16} />} delay={0.25}>
+        <ChartCard title={t('dashboard.asset_types')} icon={<Layers size={16} />} delay={0.25}>
            <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie
@@ -251,24 +252,24 @@ const DashboardGrid: React.FC<DashboardGridProps> = ({ results = [] }) => {
         </ChartCard>
 
         {/* IP List */}
-        <ChartCard title="IP 列表" icon={<Network size={16} />} delay={0.3}>
+        <ChartCard title={t('dashboard.ip_list')} icon={<Network size={16} />} delay={0.3}>
           <div className="w-full space-y-2 overflow-y-auto max-h-full pr-1">
             {stats.ips.map((ip, i) => (
-              <div key={i} className="flex items-center justify-between p-2 rounded-lg bg-zinc-900/50 hover:bg-zinc-800 text-xs transition-colors">
-                <span className="text-zinc-300 font-mono">{ip}</span>
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400">Active</span>
+              <div key={i} className="flex items-center justify-between p-2 rounded-lg bg-muted hover:bg-accent text-xs transition-colors">
+                <span className="text-foreground font-mono">{ip}</span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400">{t('dashboard.active')}</span>
               </div>
             ))}
-            {stats.ips.length === 0 && <div className="text-zinc-500 text-sm text-center mt-10">暂无数据</div>}
+            {stats.ips.length === 0 && <div className="text-muted-foreground text-sm text-center mt-10">{t('dashboard.no_data')}</div>}
           </div>
         </ChartCard>
 
         {/* Top Ports Horizontal Bar */}
-        <ChartCard title="端口排行" icon={<Terminal size={16} />} delay={0.35}>
+        <ChartCard title={t('dashboard.port_rank')} icon={<Terminal size={16} />} delay={0.35}>
            <ResponsiveContainer width="100%" height="100%">
             <BarChart data={stats.topPorts} layout="vertical">
               <XAxis type="number" hide />
-              <YAxis dataKey="name" type="category" stroke="#52525b" fontSize={10} width={30} tickLine={false} axisLine={false} />
+              <YAxis dataKey="name" type="category" stroke="var(--muted-foreground)" fontSize={10} width={30} tickLine={false} axisLine={false} />
               <Tooltip />
               <Bar dataKey="value" fill={COLORS.green} radius={[0, 4, 4, 0]} barSize={20} />
             </BarChart>
@@ -276,9 +277,9 @@ const DashboardGrid: React.FC<DashboardGridProps> = ({ results = [] }) => {
         </ChartCard>
 
         {/* Vulnerabilities (Placeholder) */}
-        <ChartCard title="漏洞" icon={<ShieldAlert size={16} />} delay={0.4}>
-          <div className="flex items-center justify-center h-full text-zinc-500 text-sm">
-            暂无漏洞数据
+        <ChartCard title={t('dashboard.vulns')} icon={<ShieldAlert size={16} />} delay={0.4}>
+          <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
+            {t('dashboard.no_vuln_data')}
           </div>
         </ChartCard>
       </div>

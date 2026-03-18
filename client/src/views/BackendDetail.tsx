@@ -37,9 +37,9 @@ export const BackendDetail: React.FC<BackendDetailProps> = ({ backend }) => {
                         <Server size={24} />
                     </div>
                     <div>
-                        <h1 className="text-xl font-bold text-white tracking-tight">{backend.name}</h1>
+                        <h1 className="text-xl font-bold text-foreground tracking-tight">{backend.name}</h1>
                         <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
-                            <span className="bg-secondary px-1.5 py-0.5 rounded text-gray-300 font-mono">{backend.address ?? backend.name}</span>
+                            <span className="bg-secondary px-1.5 py-0.5 rounded text-muted-foreground font-mono">{backend.address ?? backend.name}</span>
                             <span>•</span>
                         </div>
                     </div>
@@ -47,7 +47,7 @@ export const BackendDetail: React.FC<BackendDetailProps> = ({ backend }) => {
                 <button
                     onClick={() => refetch()}
                     disabled={loading}
-                    className="p-2 hover:bg-white/5 rounded-md text-gray-400 hover:text-white transition-colors"
+                    className="p-2 hover:bg-accent rounded-md text-muted-foreground hover:text-foreground transition-colors"
                     title={t('backend_detail.refresh_metrics')}
                 >
                     <RefreshCcw size={18} className={loading ? 'animate-spin' : ''} />
@@ -65,11 +65,11 @@ export const BackendDetail: React.FC<BackendDetailProps> = ({ backend }) => {
                             <div className="bg-card border border-border rounded-lg p-4 flex flex-col justify-between hover:border-blue-500/30 transition-colors">
                                 <div className="flex justify-between items-start mb-2">
                                     <span className="text-xs font-semibold text-muted-foreground uppercase">{t('backend_detail.system')}</span>
-                                    <Terminal size={16} className="text-gray-500" />
+                                    <Terminal size={16} className="text-muted-foreground" />
                                 </div>
                                 <div>
-                                    <div className="text-sm font-medium text-white truncate" title={info.os ?? t('backend_detail.unknown')}>{info.os ?? t('backend_detail.unknown')}</div>
-                                    <div className="text-xs text-gray-500 font-mono mt-1">{info.hostname ?? t('backend_detail.unknown')}</div>
+                                    <div className="text-sm font-medium text-foreground truncate" title={info.os ?? t('backend_detail.unknown')}>{info.os ?? t('backend_detail.unknown')}</div>
+                                    <div className="text-xs text-muted-foreground font-mono mt-1">{info.hostname ?? t('backend_detail.unknown')}</div>
                                 </div>
                             </div>
 
@@ -77,11 +77,11 @@ export const BackendDetail: React.FC<BackendDetailProps> = ({ backend }) => {
                             <div className="bg-card border border-border rounded-lg p-4 flex flex-col justify-between hover:border-green-500/30 transition-colors">
                                 <div className="flex justify-between items-start mb-2">
                                     <span className="text-xs font-semibold text-muted-foreground uppercase">{t('backend_detail.uptime')}</span>
-                                    <Clock size={16} className="text-gray-500" />
+                                    <Clock size={16} className="text-muted-foreground" />
                                 </div>
                                 <div>
                                     <div className="text-lg font-mono text-green-400">{formatUptime(info.uptimeSeconds ?? 0)}</div>
-                                    <div className="text-xs text-gray-500 mt-1">{t('backend_detail.version', { version: info.version ?? t('backend_detail.unknown') })}</div>
+                                    <div className="text-xs text-muted-foreground mt-1">{t('backend_detail.version', { version: info.version ?? t('backend_detail.unknown') })}</div>
                                 </div>
                             </div>
 
@@ -89,17 +89,17 @@ export const BackendDetail: React.FC<BackendDetailProps> = ({ backend }) => {
                             <div className="bg-card border border-border rounded-lg p-4 flex flex-col justify-between hover:border-orange-500/30 transition-colors">
                                 <div className="flex justify-between items-start mb-2">
                                     <span className="text-xs font-semibold text-muted-foreground uppercase">{t('backend_detail.load_average')}</span>
-                                    <Activity size={16} className="text-gray-500" />
+                                    <Activity size={16} className="text-muted-foreground" />
                                 </div>
                                 <div>
-                                    <div className="flex gap-2 font-mono text-sm text-white">
+                                    <div className="flex gap-2 font-mono text-sm text-foreground">
                                         {(info.loadAverage ?? []).map((load, idx) => (
-                                            <span key={idx} className="bg-black/40 px-2 py-1 rounded border border-white/5">
+                                            <span key={idx} className="bg-muted px-2 py-1 rounded border border-border">
                                                 {load.toFixed(2)}
                                             </span>
                                         ))}
                                     </div>
-                                    <div className="text-xs text-gray-500 mt-2">{t('backend_detail.cores_available', { count: info.cpuCores ?? 0 })}</div>
+                                    <div className="text-xs text-muted-foreground mt-2">{t('backend_detail.cores_available', { count: info.cpuCores ?? 0 })}</div>
                                 </div>
                             </div>
                         </div>
@@ -110,13 +110,13 @@ export const BackendDetail: React.FC<BackendDetailProps> = ({ backend }) => {
                             <div className="bg-card border border-border rounded-lg p-5">
                                 <div className="flex items-center gap-2 mb-4">
                                     <Cpu size={18} className="text-purple-400" />
-                                    <h3 className="text-sm font-semibold text-white">{t('backend_detail.memory_usage')}</h3>
+                                    <h3 className="text-sm font-semibold text-foreground">{t('backend_detail.memory_usage')}</h3>
                                 </div>
 
                                 <div className="space-y-1">
-                                    <div className="flex justify-between text-xs text-gray-400 mb-1">
-                                        <span>Used: {formatBytes((info.memoryTotalBytes ?? 0) - (info.memoryFreeBytes ?? 0))}</span>
-                                        <span>Total: {formatBytes(info.memoryTotalBytes ?? 0)}</span>
+                                    <div className="flex justify-between text-xs text-muted-foreground mb-1">
+                                        <span>{t('backend_detail.used')}: {formatBytes((info.memoryTotalBytes ?? 0) - (info.memoryFreeBytes ?? 0))}</span>
+                                        <span>{t('backend_detail.total')}: {formatBytes(info.memoryTotalBytes ?? 0)}</span>
                                     </div>
                                     <div className="h-2.5 bg-secondary rounded-full overflow-hidden">
                                         <div
@@ -131,13 +131,13 @@ export const BackendDetail: React.FC<BackendDetailProps> = ({ backend }) => {
                             <div className="bg-card border border-border rounded-lg p-5">
                                 <div className="flex items-center gap-2 mb-4">
                                     <HardDrive size={18} className="text-yellow-400" />
-                                    <h3 className="text-sm font-semibold text-white">{t('backend_detail.disk_usage')}</h3>
+                                    <h3 className="text-sm font-semibold text-foreground">{t('backend_detail.disk_usage')}</h3>
                                 </div>
 
                                 <div className="space-y-1">
-                                    <div className="flex justify-between text-xs text-gray-400 mb-1">
-                                        <span>Used: {formatBytes((info.diskTotalBytes ?? 0) - (info.diskFreeBytes ?? 0))}</span>
-                                        <span>Total: {formatBytes(info.diskTotalBytes ?? 0)}</span>
+                                    <div className="flex justify-between text-xs text-muted-foreground mb-1">
+                                        <span>{t('backend_detail.used')}: {formatBytes((info.diskTotalBytes ?? 0) - (info.diskFreeBytes ?? 0))}</span>
+                                        <span>{t('backend_detail.total')}: {formatBytes(info.diskTotalBytes ?? 0)}</span>
                                     </div>
                                     <div className="h-2.5 bg-secondary rounded-full overflow-hidden">
                                         <div
@@ -170,13 +170,13 @@ export const BackendDetail: React.FC<BackendDetailProps> = ({ backend }) => {
 
                 {!info && !loading && !error && (
                     <div className="p-8 text-center text-muted-foreground border border-dashed border-border rounded-lg">
-                        No server metrics available for this backend type.
+                        {t('backend_detail.no_metrics')}
                     </div>
                 )}
 
                 {error && (
                     <div className="p-8 text-center text-red-400 border border-dashed border-red-900/50 rounded-lg">
-                        Error loading metrics: {error.message}
+                        {t('backend_detail.error_metrics', { message: error.message })}
                     </div>
                 )}
 

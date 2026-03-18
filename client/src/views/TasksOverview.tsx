@@ -43,7 +43,7 @@ export const TasksOverview: React.FC = () => {
       case TaskStatus.RUNNING:
         return 'bg-blue-500/20';
       default:
-        return 'bg-gray-500/10';
+        return 'bg-muted/30';
     }
   };
 
@@ -90,7 +90,7 @@ export const TasksOverview: React.FC = () => {
           <h2 className="text-xl font-bold">{t('sidebar.tasks')}</h2>
         </div>
         <div>
-          <button onClick={() => navigate('/tasks/new')} className="px-3 py-2 bg-white text-black rounded-md">
+        <button onClick={() => navigate('/tasks/new')} className="px-3 py-1.5 bg-primary text-primary-foreground text-sm font-semibold rounded-md hover:opacity-90 transition-opacity">
             {t('sidebar.new_task')}
           </button>
         </div>

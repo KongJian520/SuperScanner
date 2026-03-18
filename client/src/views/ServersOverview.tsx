@@ -1,10 +1,12 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Server } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { Server, Wifi, WifiOff } from 'lucide-react';
 import { useBackends, useDeleteBackend } from '../hooks/use-scanner-api';
 import { useAppStore } from '../lib/store';
 
 export const ServersOverview: React.FC = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { setActiveBackendId, setActiveTaskId } = useAppStore();
   const { data: backends = [], isLoading } = useBackends();
@@ -25,29 +27,54 @@ export const ServersOverview: React.FC = () => {
     <div className="p-6 overflow-y-auto h-full">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          <Server />
-          <h2 className="text-xl font-bold">Servers</h2>
+          <Server size={20} className="text-muted-foreground" />
+          <h2 className="text-xl font-bold text-foreground">{t('servers.title')}</h2>
         </div>
-        <div>
-          <button onClick={() => navigate('/servers/new')} className="px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-500 transition-colors">Add Backend</button>
-        </div>
+        <button
+          onClick={() => navigate('/servers/new')}
+          className="px-3 py-1.5 bg-primary text-primary-foreground text-sm font-semibold rounded-md hover:opacity-90 transition-opacity"
+        >
+          {t('servers.add')}
+        </button>
       </div>
 
       {isLoading ? (
-          <div className="text-sm text-muted-foreground">Loading backends...</div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="h-20 rounded-lg bg-card animate-pulse" style={{ animationDelay: `${i * 80}ms` }} />
+          ))}
+        </div>
       ) : backends.length === 0 ? (
-        <div className="text-sm text-muted-foreground">No backends configured.</div>
+        <div className="p-8 text-center text-muted-foreground border border-dashed border-border rounded-lg text-sm">
+          {t('servers.no_backends')}
+        </div>
       ) : (
-        <div className="space-y-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {backends.map((b, idx) => (
-            <div key={b.id ?? `${b.name}-${idx}`} className="flex items-center justify-between p-3 bg-card rounded-md cursor-pointer hover:bg-accent transition-colors" onClick={() => handleSelectBackend(b.id)}>
-              <div>
-                <div className="font-semibold">{b.name}</div>
-                <div className="text-xs text-muted-foreground">{b.address ?? b.name}</div>
+            <div
+              key={b.id ?? `${b.name}-${idx}`}
+              className="group relative flex items-center gap-4 p-4 bg-card border border-border rounded-lg cursor-pointer hover:bg-accent hover:border-primary/30 transition-all"
+              onClick={() => handleSelectBackend(b.id)}
+            >
+              <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-500 border border-blue-500/20 flex-shrink-0">
+                <Server size={18} />
               </div>
-              <div>
-                <button onClick={(e) => handleDeleteBackend(b.id ?? `${b.name}-${idx}`, e)} className="text-sm text-red-400 hover:text-red-300">Delete</button>
+              <div className="flex-1 min-w-0">
+                <div className="font-semibold text-foreground truncate">{b.name}</div>
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
+                  {b.address ? (
+                    <><Wifi size={10} className="text-green-500" /><span className="font-mono truncate">{b.address}</span></>
+                  ) : (
+                    <><WifiOff size={10} /><span>{t('servers.no_address')}</span></>
+                  )}
+                </div>
               </div>
+              <button
+                onClick={(e) => handleDeleteBackend(b.id ?? `${b.name}-${idx}`, e)}
+                className="text-xs text-destructive opacity-0 group-hover:opacity-100 transition-opacity hover:underline flex-shrink-0"
+              >
+                {t('servers.delete')}
+              </button>
             </div>
           ))}
         </div>

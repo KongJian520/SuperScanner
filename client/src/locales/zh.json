@@ -7,7 +7,9 @@
     "delete": "删除",
     "edit": "编辑",
     "create": "创建",
-    "confirm": "确认"
+    "confirm": "确认",
+    "no_data": "暂无数据",
+    "no_address": "无地址"
   },
   "sidebar": {
     "tasks": "任务",
@@ -70,6 +72,7 @@
     "start": "开始",
     "stop": "停止",
     "restart": "重启",
+    "restart_success": "任务已重启",
     "processing": "处理中...",
     "targets": "目标",
     "exit_code": "退出代码: {{code}}",
@@ -79,7 +82,12 @@
     "scan_results": "扫描结果",
     "results_placeholder": "完成后结果将显示在此处。",
     "export_report": "导出报告",
-    "error_restart_no_targets": "无法重启：未找到目标"
+    "error_restart_no_targets": "无法重启：未找到目标",
+    "no_results": "暂无扫描结果",
+    "stat_assets": "资产",
+    "stat_ports": "端口",
+    "stat_services": "服务",
+    "stat_vulns": "漏洞"
   },
   "backend_detail": {
     "refresh_metrics": "刷新指标",
@@ -90,6 +98,52 @@
     "cores_available": "{{count}} 核心可用",
     "memory_usage": "内存使用",
     "disk_usage": "磁盘使用",
-    "unknown": "未知"
+    "unknown": "未知",
+    "no_metrics": "该后端暂无服务器指标。",
+    "error_metrics": "加载指标失败：{{message}}",
+    "used": "已用",
+    "total": "总计"
+  },
+  "servers": {
+    "title": "服务器",
+    "add": "+ 添加",
+    "no_backends": "未配置后端。",
+    "delete": "删除",
+    "no_address": "无地址"
+  },
+  "dashboard": {
+    "assets": "资产",
+    "alive_ips": "存活IP",
+    "ports": "端口",
+    "vulns": "漏洞",
+    "protocol_dist": "协议分布",
+    "service_types": "服务类型",
+    "port_dist": "端口分布",
+    "software_vendors": "软件厂商",
+    "asset_types": "资产类型",
+    "ip_list": "IP 列表",
+    "port_rank": "端口排行",
+    "no_data": "暂无数据",
+    "services_detected": "共检测到 {{count}} 种不同的服务",
+    "active": "活跃",
+    "no_vuln_data": "暂无漏洞数据"
+  },
+  "menu": {
+    "file": "文件",
+    "new_task": "新建任务",
+    "add_server": "添加服务器",
+    "close_window": "关闭窗口",
+    "view": "视图",
+    "tasks": "任务",
+    "servers": "服务器",
+    "help": "帮助",
+    "about": "关于 PolyScan Pro"
+  },
+  "activity_bar": {
+    "tasks": "任务",
+    "servers": "服务器",
+    "light_mode": "浅色模式",
+    "dark_mode": "深色模式",
+    "settings": "设置"
   }
 }
