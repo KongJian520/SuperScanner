@@ -120,6 +120,7 @@ impl CommandRegistry {
 pub mod ping;
 pub mod nmap;
 pub mod port_scan;
+pub mod service_probes;
 pub mod curl;
 pub mod httpx;
 pub mod nuclei;

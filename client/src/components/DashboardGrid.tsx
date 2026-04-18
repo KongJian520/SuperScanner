@@ -1,6 +1,6 @@
 import React, { useMemo, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { motion } from 'framer-motion';
+import { motion, useInView, useReducedMotion } from 'framer-motion';
 import {
   PieChart, Pie, Cell, ResponsiveContainer,
   BarChart, Bar, XAxis, YAxis, Tooltip,
@@ -21,21 +21,30 @@ import { COLORS } from '../constants';
 import { ScanResult } from '../types';
 
 // count-up hook
-function useCountUp(target: number, duration = 600) {
+function useCountUp(target: number, duration = 600, shouldStart = true, disabled = false) {
   const [value, setValue] = useState(0);
   const rafRef = useRef<number>(0);
   useEffect(() => {
-    const start = performance.now();
+    if (disabled) {
+      setValue(target);
+      return;
+    }
+    if (!shouldStart) {
+      setValue(0);
+      return;
+    }
+
+    const startTime = performance.now();
     const from = 0;
     const animate = (now: number) => {
-      const progress = Math.min((now - start) / duration, 1);
+      const progress = Math.min((now - startTime) / duration, 1);
       const ease = 1 - Math.pow(1 - progress, 3); // ease-out cubic
       setValue(Math.round(from + (target - from) * ease));
       if (progress < 1) rafRef.current = requestAnimationFrame(animate);
     };
     rafRef.current = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(rafRef.current);
-  }, [target, duration]);
+  }, [target, duration, shouldStart, disabled]);
   return value;
 }
 
@@ -47,13 +56,20 @@ const cardColors: Record<string, { bg: string; border: string; text: string }> =
 };
 
 const StatCard: React.FC<{ title: string; value: number; icon: React.ReactNode; color: string }> = ({ title, value, icon, color }) => {
-  const displayValue = useCountUp(value);
+  const shouldReduceMotion = !!useReducedMotion();
+  const cardRef = useRef<HTMLDivElement | null>(null);
+  const isInView = useInView(cardRef, { once: true, amount: 0.35 });
+  const displayValue = useCountUp(value, shouldReduceMotion ? 0 : 600, isInView, shouldReduceMotion);
   const c = cardColors[color] ?? cardColors.blue;
   return (
     <motion.div
+      ref={cardRef}
       className={`relative overflow-hidden ${c.bg} rounded-xl p-5 group cursor-default border ${c.border}`}
-      whileHover={{ y: -4, scale: 1.02 }}
-      transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+      initial={shouldReduceMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: 8 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, amount: 0.35 }}
+      whileHover={shouldReduceMotion ? undefined : { y: -2, scale: 1.01 }}
+      transition={{ duration: shouldReduceMotion ? 0 : 0.22, ease: 'easeOut' }}
     >
       <div className="absolute right-[-10px] bottom-[-10px] opacity-20 transform scale-150 rotate-[-15deg] group-hover:scale-[1.8] transition-transform duration-300">
         {icon}
@@ -72,26 +88,30 @@ const ChartCard: React.FC<{
   children: React.ReactNode;
   verified?: boolean;
   delay?: number;
-}> = ({ title, icon, children, verified = true, delay = 0 }) => (
-  <motion.div
-    className="bg-card rounded-xl border border-border flex flex-col h-[320px]"
-    initial={{ opacity: 0, y: 12 }}
-    animate={{ opacity: 1, y: 0 }}
-    transition={{ duration: 0.25, ease: 'easeOut', delay }}
-  >
-    <div className="p-4 flex items-center justify-between border-b border-border">
-      <div className="flex items-center gap-2">
-        <span className="text-blue-500">{icon}</span>
-        <span className="font-semibold text-sm text-foreground">{title}</span>
-        {verified && <CheckCircle2 size={14} className="text-green-500/80" />}
+}> = ({ title, icon, children, verified = true, delay = 0 }) => {
+  const shouldReduceMotion = !!useReducedMotion();
+  return (
+    <motion.div
+      className="bg-card rounded-xl border border-border flex flex-col h-[320px]"
+      initial={shouldReduceMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: 10 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, amount: 0.2 }}
+      transition={{ duration: shouldReduceMotion ? 0 : 0.2, ease: 'easeOut', delay: shouldReduceMotion ? 0 : Math.min(delay, 0.18) }}
+    >
+      <div className="p-4 flex items-center justify-between border-b border-border">
+        <div className="flex items-center gap-2">
+          <span className="text-blue-500">{icon}</span>
+          <span className="font-semibold text-sm text-foreground">{title}</span>
+          {verified && <CheckCircle2 size={14} className="text-green-500/80" />}
+        </div>
+        <ChevronRight size={16} className="text-muted-foreground cursor-pointer hover:text-foreground transition-colors" />
       </div>
-      <ChevronRight size={16} className="text-muted-foreground cursor-pointer hover:text-foreground transition-colors" />
-    </div>
-    <div className="flex-1 p-4 flex items-center justify-center overflow-hidden">
-      {children}
-    </div>
-  </motion.div>
-);
+      <div className="flex-1 p-4 flex items-center justify-center overflow-hidden">
+        {children}
+      </div>
+    </motion.div>
+  );
+};
 
 interface DashboardGridProps {
   results: ScanResult[];
@@ -99,6 +119,7 @@ interface DashboardGridProps {
 
 const DashboardGrid: React.FC<DashboardGridProps> = ({ results = [] }) => {
   const { t } = useTranslation();
+  const shouldReduceMotion = !!useReducedMotion();
   const chartColors = [COLORS.blue, COLORS.purple, COLORS.green, COLORS.yellow, COLORS.red];
 
   const stats = useMemo(() => {
@@ -172,6 +193,7 @@ const DashboardGrid: React.FC<DashboardGridProps> = ({ results = [] }) => {
                   outerRadius={80}
                   paddingAngle={5}
                   dataKey="value"
+                  isAnimationActive={!shouldReduceMotion}
                 >
                   {stats.protocols.map((_entry, index) => (
                     <Cell key={`cell-${index}`} fill={chartColors[index % chartColors.length]} />
@@ -199,7 +221,7 @@ const DashboardGrid: React.FC<DashboardGridProps> = ({ results = [] }) => {
                 </div>
                 <div className="h-1.5 w-full bg-secondary rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-blue-500 rounded-full transition-all duration-1000"
+                    className="h-full bg-blue-500 rounded-full motion-safe:transition-[width] motion-safe:duration-500"
                     style={{ width: `${(item.value / stats.totalPorts) * 100}%` }}
                   ></div>
                 </div>
@@ -218,7 +240,7 @@ const DashboardGrid: React.FC<DashboardGridProps> = ({ results = [] }) => {
                 cursor={{ fill: 'var(--accent)' }}
                 contentStyle={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: '8px' }}
               />
-              <Bar dataKey="value" fill={COLORS.purple} radius={[4, 4, 0, 0]} />
+              <Bar dataKey="value" fill={COLORS.purple} radius={[4, 4, 0, 0]} isAnimationActive={!shouldReduceMotion} />
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
@@ -244,6 +266,7 @@ const DashboardGrid: React.FC<DashboardGridProps> = ({ results = [] }) => {
                 outerRadius={80}
                 dataKey="value"
                 labelLine={false}
+                isAnimationActive={!shouldReduceMotion}
               >
                  <Cell fill={COLORS.blue} />
               </Pie>
@@ -271,7 +294,7 @@ const DashboardGrid: React.FC<DashboardGridProps> = ({ results = [] }) => {
               <XAxis type="number" hide />
               <YAxis dataKey="name" type="category" stroke="var(--muted-foreground)" fontSize={10} width={30} tickLine={false} axisLine={false} />
               <Tooltip />
-              <Bar dataKey="value" fill={COLORS.green} radius={[0, 4, 4, 0]} barSize={20} />
+              <Bar dataKey="value" fill={COLORS.green} radius={[0, 4, 4, 0]} barSize={20} isAnimationActive={!shouldReduceMotion} />
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>

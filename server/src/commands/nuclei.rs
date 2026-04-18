@@ -5,7 +5,16 @@ use async_trait::async_trait;
 use sqlx::sqlite::SqlitePool;
 use std::path::PathBuf;
 
-pub struct NucleiCommand;
+#[derive(Clone)]
+pub struct NucleiCommand {
+    binary: String,
+}
+
+impl NucleiCommand {
+    pub fn new(binary: String) -> Self {
+        Self { binary }
+    }
+}
 
 #[async_trait]
 impl ScannerCommand for NucleiCommand {
@@ -20,7 +29,7 @@ impl ScannerCommand for NucleiCommand {
     fn build_spec(&self, targets: &[String], args: &[String]) -> CommandSpec {
         CommandSpec {
             id: "nuclei".to_string(),
-            program: PathBuf::from("nuclei"),
+            program: PathBuf::from(&self.binary),
             args: args.to_vec(),
             targets: targets.to_vec(),
             env: None,
@@ -46,6 +55,6 @@ impl ScannerCommand for NucleiCommand {
     }
 
     fn box_clone(&self) -> Box<dyn ScannerCommand> {
-        Box::new(NucleiCommand)
+        Box::new(self.clone())
     }
 }

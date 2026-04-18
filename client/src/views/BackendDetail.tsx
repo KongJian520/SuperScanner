@@ -1,9 +1,12 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BackendConfig } from '../types';
 import { getUsagePercentage } from '@/lib/utils';
-import { Activity, Clock, Cpu, HardDrive,  RefreshCcw, Server, Terminal } from 'lucide-react';
+import { Activity, ArrowLeft, Check, Clock, Cpu, HardDrive, RefreshCcw, Server, Terminal, X } from 'lucide-react';
 import { useServerInfo } from '../hooks/use-scanner-api';
+import { AnimatePresence, motion } from 'framer-motion';
+import { microInteraction, stateTransition } from '../lib/motion';
+import { Link } from 'react-router-dom';
 
 interface BackendDetailProps {
     backend: BackendConfig;
@@ -12,6 +15,28 @@ interface BackendDetailProps {
 export const BackendDetail: React.FC<BackendDetailProps> = ({ backend }) => {
     const { t } = useTranslation();
     const { data: info, isLoading: loading, error, refetch } = useServerInfo(backend.id);
+    const [refreshState, setRefreshState] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+    const resetTimer = useRef<number | null>(null);
+
+    useEffect(() => {
+        return () => {
+            if (resetTimer.current) window.clearTimeout(resetTimer.current);
+        };
+    }, []);
+
+    const setRefreshFeedback = (state: 'idle' | 'loading' | 'success' | 'error') => {
+        if (resetTimer.current) window.clearTimeout(resetTimer.current);
+        setRefreshState(state);
+        if (state === 'success' || state === 'error') {
+            resetTimer.current = window.setTimeout(() => setRefreshState('idle'), 1300);
+        }
+    };
+
+    const handleRefresh = async () => {
+        setRefreshFeedback('loading');
+        const result = await refetch();
+        setRefreshFeedback(result.error ? 'error' : 'success');
+    };
 
     const formatBytes = (bytes: number) => {
         if (bytes === 0) return '0 B';
@@ -31,34 +56,62 @@ export const BackendDetail: React.FC<BackendDetailProps> = ({ backend }) => {
     return (
         <div className="flex-1 flex flex-col h-full overflow-hidden bg-background">
             {/* Header Section */}
-            <div className="p-6 border-b border-border bg-card/50 flex items-center justify-between">
-                <div className="flex items-center gap-4">
+            <div className="p-4 md:p-6 border-b border-border bg-card/50 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 md:gap-4 min-w-0">
+                    <Link
+                        to="/servers"
+                        className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background/70 px-2.5 py-1.5 text-xs text-foreground hover:bg-accent/70 transition-colors md:text-sm"
+                    >
+                        <ArrowLeft size={14} />
+                        {t('common.back')}
+                    </Link>
                     <div className="w-12 h-12 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-500 border border-blue-500/20">
                         <Server size={24} />
                     </div>
-                    <div>
+                    <div className="min-w-0">
                         <h1 className="text-xl font-bold text-foreground tracking-tight">{backend.name}</h1>
                         <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
-                            <span className="bg-secondary px-1.5 py-0.5 rounded text-muted-foreground font-mono">{backend.address ?? backend.name}</span>
+                            <span className="bg-secondary px-1.5 py-0.5 rounded text-muted-foreground font-mono truncate max-w-[26ch]">{backend.address ?? backend.name}</span>
                             <span>•</span>
                         </div>
                     </div>
                 </div>
-                <button
-                    onClick={() => refetch()}
-                    disabled={loading}
-                    className="p-2 hover:bg-accent rounded-md text-muted-foreground hover:text-foreground transition-colors"
+                <motion.button
+                    onClick={handleRefresh}
+                    disabled={loading || refreshState === 'loading'}
+                    whileTap={{ scale: microInteraction.actionButtonPress.scale }}
+                    transition={{ duration: microInteraction.actionButtonPress.duration, ease: microInteraction.actionButtonPress.ease }}
+                    className={`p-2 rounded-md border transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                        refreshState === 'success'
+                            ? 'text-emerald-300 border-emerald-500/40 bg-emerald-500/10'
+                            : refreshState === 'error'
+                                ? 'text-destructive border-destructive/40 bg-destructive/10'
+                                : 'text-muted-foreground border-transparent hover:bg-accent hover:text-foreground'
+                    }`}
                     title={t('backend_detail.refresh_metrics')}
                 >
-                    <RefreshCcw size={18} className={loading ? 'animate-spin' : ''} />
-                </button>
+                    {refreshState === 'success' ? (
+                        <Check size={18} />
+                    ) : refreshState === 'error' ? (
+                        <X size={18} />
+                    ) : (
+                        <RefreshCcw size={18} className={refreshState === 'loading' ? 'animate-spin' : ''} />
+                    )}
+                </motion.button>
             </div>
 
             {/* Dashboard Content */}
             <div className="flex-1 overflow-y-auto p-6 space-y-6">
-
-                {info && (
-                    <>
+                <AnimatePresence mode="wait" initial={false}>
+                    {info ? (
+                        <motion.div
+                            key="content"
+                            className="space-y-6"
+                            variants={stateTransition.surface}
+                            initial="initial"
+                            animate="animate"
+                            exit="exit"
+                        >
                         {/* Top Stats Grid */}
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             {/* OS / System */}
@@ -68,8 +121,8 @@ export const BackendDetail: React.FC<BackendDetailProps> = ({ backend }) => {
                                     <Terminal size={16} className="text-muted-foreground" />
                                 </div>
                                 <div>
-                                    <div className="text-sm font-medium text-foreground truncate" title={info.os ?? t('backend_detail.unknown')}>{info.os ?? t('backend_detail.unknown')}</div>
-                                    <div className="text-xs text-muted-foreground font-mono mt-1">{info.hostname ?? t('backend_detail.unknown')}</div>
+                                    <div className="text-sm font-medium text-foreground truncate" title={info.os ?? t('common.na')}>{info.os ?? t('common.na')}</div>
+                                    <div className="text-xs text-muted-foreground font-mono mt-1">{info.hostname ?? t('common.na')}</div>
                                 </div>
                             </div>
 
@@ -81,7 +134,7 @@ export const BackendDetail: React.FC<BackendDetailProps> = ({ backend }) => {
                                 </div>
                                 <div>
                                     <div className="text-lg font-mono text-green-400">{formatUptime(info.uptimeSeconds ?? 0)}</div>
-                                    <div className="text-xs text-muted-foreground mt-1">{t('backend_detail.version', { version: info.version ?? t('backend_detail.unknown') })}</div>
+                                    <div className="text-xs text-muted-foreground mt-1">{t('backend_detail.version', { version: info.version ?? t('common.na') })}</div>
                                 </div>
                             </div>
 
@@ -150,11 +203,16 @@ export const BackendDetail: React.FC<BackendDetailProps> = ({ backend }) => {
                         </div>
 
 
-                    </>
-                )}
-
-                {loading && (
-                    <div className="space-y-4">
+                        </motion.div>
+                    ) : loading ? (
+                        <motion.div
+                            key="loading"
+                            className="space-y-4"
+                            variants={stateTransition.surface}
+                            initial="initial"
+                            animate="animate"
+                            exit="exit"
+                        >
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             {[...Array(3)].map((_, i) => (
                                 <div key={i} className="h-24 rounded-lg bg-card animate-pulse" style={{ animationDelay: `${i * 100}ms` }} />
@@ -165,22 +223,31 @@ export const BackendDetail: React.FC<BackendDetailProps> = ({ backend }) => {
                                 <div key={i} className="h-32 rounded-lg bg-card animate-pulse" style={{ animationDelay: `${(i + 3) * 100}ms` }} />
                             ))}
                         </div>
-                    </div>
-                )}
-
-                {!info && !loading && !error && (
-                    <div className="p-8 text-center text-muted-foreground border border-dashed border-border rounded-lg">
+                        </motion.div>
+                    ) : error ? (
+                        <motion.div
+                            key="error"
+                            className="p-8 text-center text-red-400 border border-dashed border-red-900/50 rounded-lg"
+                            variants={stateTransition.surface}
+                            initial="initial"
+                            animate="animate"
+                            exit="exit"
+                        >
+                            {t('backend_detail.error_metrics', { message: error.message })}
+                        </motion.div>
+                    ) : (
+                        <motion.div
+                            key="empty"
+                            className="p-8 text-center text-muted-foreground border border-dashed border-border rounded-lg"
+                            variants={stateTransition.surface}
+                            initial="initial"
+                            animate="animate"
+                            exit="exit"
+                        >
                         {t('backend_detail.no_metrics')}
-                    </div>
-                )}
-
-                {error && (
-                    <div className="p-8 text-center text-red-400 border border-dashed border-red-900/50 rounded-lg">
-                        {t('backend_detail.error_metrics', { message: error.message })}
-                    </div>
-                )}
-
-
+                        </motion.div>
+                    )}
+                </AnimatePresence>
             </div>
         </div>
     );

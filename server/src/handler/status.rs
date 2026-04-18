@@ -1,13 +1,16 @@
 use async_trait::async_trait;
 use tonic::{Request, Response, Status};
 use sysinfo::Disks;
+use crate::config::ToolCapability;
 use crate::handler::status_proto::{server_info_server, ServerInfoRequest, ServerInfoResponse};
 
-pub struct ServerInfoService;
+pub struct ServerInfoService {
+    tool_capabilities: Vec<ToolCapability>,
+}
 
 impl ServerInfoService {
-    pub fn new() -> Self {
-        Self {}
+    pub fn new(tool_capabilities: Vec<ToolCapability>) -> Self {
+        Self { tool_capabilities }
     }
 }
 
@@ -17,6 +20,7 @@ impl server_info_server::ServerInfo for ServerInfoService {
         &self,
         _req: Request<ServerInfoRequest>,
     ) -> Result<Response<ServerInfoResponse>, Status> {
+        let tools = self.tool_capabilities.clone();
         let collect = tokio::task::spawn_blocking(move || -> Result<ServerInfoResponse, String> {
             let mut sys = sysinfo::System::new();
             sys.refresh_all();
@@ -56,6 +60,12 @@ impl server_info_server::ServerInfo for ServerInfoService {
                 disk_total_bytes: disk_total,
                 disk_free_bytes: disk_free,
                 load_average: Vec::new(),
+                tools: tools.into_iter().map(|t| crate::handler::status_proto::ToolCapability {
+                    tool_id: t.tool_id,
+                    available: t.available,
+                    source: t.source,
+                    path: t.path.unwrap_or_default(),
+                }).collect(),
             })
         })
         .await

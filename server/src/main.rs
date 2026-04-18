@@ -51,7 +51,7 @@ async fn main() -> anyhow::Result<()> {
     }
 
     // 初始化文件存储
-    let tasks_dir = config.tasks_dir;
+    let tasks_dir = config.tasks_dir.clone();
     if !tasks_dir.exists() {
         tokio::fs::create_dir_all(&tasks_dir).await.context("无法创建任务目录")?;
     }
@@ -77,17 +77,37 @@ async fn main() -> anyhow::Result<()> {
     }
 
     // 初始化命令注册表
-    let registry = CommandRegistry::new()
+    let mut registry = CommandRegistry::new()
         .register(PingCommand)
-        .register(NmapCommand)
-        .register(BuiltinPortScanCommand)
-        .register(HttpxCommand)
-        .register(NucleiCommand);
+        .register(BuiltinPortScanCommand);
+    if let Some(nmap_binary) = config.nmap_binary.clone() {
+        registry = registry.register(NmapCommand::new(
+            nmap_binary,
+            config.nmap_default_args.clone(),
+            config.nmap_timeout_secs,
+        ));
+    }
+    if let Some(httpx_binary) = config
+        .tool_capabilities
+        .iter()
+        .find(|t| t.tool_id == "httpx")
+        .and_then(|t| t.path.clone())
+    {
+        registry = registry.register(HttpxCommand::new(httpx_binary));
+    }
+    if let Some(nuclei_binary) = config
+        .tool_capabilities
+        .iter()
+        .find(|t| t.tool_id == "nuclei")
+        .and_then(|t| t.path.clone())
+    {
+        registry = registry.register(NucleiCommand::new(nuclei_binary));
+    }
     info!("已加载命令: {:?}", registry.list_commands());
 
     server_builder
         .add_service(tasks_svc_with_store(tasks_dir, store, registry))
-        .add_service(server_info_svc())
+        .add_service(server_info_svc(config.tool_capabilities.clone()))
         .serve_with_shutdown(addr, wait_for_double_ctrl_c())
         .await
         .map_err(|e| {

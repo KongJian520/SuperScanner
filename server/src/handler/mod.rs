@@ -2,6 +2,7 @@ use crate::handler::status::ServerInfoService;
 use crate::handler::tasks::TasksService;
 use crate::domain::traits::TaskStore;
 use crate::commands::CommandRegistry;
+use crate::config::ToolCapability;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -18,6 +19,6 @@ pub fn tasks_svc_with_store(root: PathBuf, store: Arc<dyn TaskStore>, registry: 
     tasks_server::TasksServer::new(TasksService::new_with_store(root, store, registry))
 }
 
-pub fn server_info_svc() -> server_info_server::ServerInfoServer<ServerInfoService> {
-    server_info_server::ServerInfoServer::new(ServerInfoService::new())
+pub fn server_info_svc(tool_capabilities: Vec<ToolCapability>) -> server_info_server::ServerInfoServer<ServerInfoService> {
+    server_info_server::ServerInfoServer::new(ServerInfoService::new(tool_capabilities))
 }

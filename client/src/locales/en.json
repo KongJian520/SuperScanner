@@ -1,4 +1,7 @@
 {
+  "app": {
+    "name": "SuperScanner"
+  },
   "common": {
     "loading": "Loading...",
     "error": "An error occurred",
@@ -8,8 +11,13 @@
     "edit": "Edit",
     "create": "Create",
     "confirm": "Confirm",
+    "back": "Back",
     "no_data": "No data",
-    "no_address": "No address"
+    "na": "N/A",
+    "no_address": "No address",
+    "chinese": "Chinese",
+    "english": "English"
+    ,"clear": "Clear"
   },
   "sidebar": {
     "tasks": "Tasks",
@@ -29,6 +37,29 @@
     "loading": "Loading tasks...",
     "empty": "No tasks yet. Create one to get started."
   },
+  "tasks_overview": {
+    "dashboard_title": "Task Command Deck",
+    "dashboard_subtitle": "Dashboard-first view for instant status awareness with fast access to task operations.",
+    "total_tasks": "Total Tasks",
+    "running_tasks": "Running",
+    "completed_tasks": "Completed",
+    "failed_tasks": "Failed/Stopped",
+    "avg_progress": "avg progress",
+    "total_targets": "{{count}} targets total",
+    "open_task_list": "Use the list below to manage tasks",
+    "list_title": "Task List",
+    "list_subtitle": "Click to open details, hover row for quick deletion",
+    "recent_update": "Latest update: {{name}}",
+    "no_backend_hint": "No active backend detected. Add a server first.",
+    "total_targets_short": "Targets {{count}}",
+    "avg_progress_short": "Progress {{percent}}%",
+    "latest_short": "Updated: {{name}}",
+    "manage_short": "Manage in list",
+    "backend_hint_short": "Add backend first",
+    "filter_all": "All",
+    "search_placeholder": "Search by task name, description, or target",
+    "no_filter_match": "No tasks match current filter/search."
+  },
   "create_task": {
     "title": "Create New Scan Task",
     "description": "Configure the target and select a backend engine to perform the scan.",
@@ -41,10 +72,25 @@
     "desc_placeholder": "Optional description",
     "select_backend": "Select Backend Engine",
     "no_backends": "No backends available. Please add a server first.",
+    "workflow_title": "Workflow Configuration",
+    "workflow_port_scan": "Port Scan",
+    "workflow_fingerprint": "Fingerprint",
+    "workflow_poc_verify": "POC Verify",
+    "tool_builtin": "Builtin",
+    "tool_nmap": "Nmap",
+    "tool_httpx": "HTTPX",
+    "tool_nuclei": "Nuclei",
     "cancel": "Cancel",
     "start_scan": "Start Scan",
     "creating": "Creating...",
-    "error_select_backend": "Please select a backend engine"
+    "error_select_backend": "Please select a backend engine",
+    "error_select_port_tool": "Please select at least one port-scan tool",
+    "error_select_fingerprint_tool": "Please select at least one fingerprint tool",
+    "error_select_poc_tool": "Please select at least one POC tool",
+    "error_select_workflow_step": "Please enable at least one workflow step",
+    "nmap_server_hint": "Tool discovery priority: environment variables > server-config.toml > system PATH. Missing tools are hidden.",
+    "tool_unavailable": "This backend does not expose the tool yet. Configure it on the server and refresh.",
+    "default_name": "Scan {{target}}"
   },
   "new_backend": {
     "title": "Add New Backend",
@@ -73,6 +119,7 @@
     "stop": "Stop",
     "restart": "Restart",
     "restart_success": "Task restarted",
+    "restart_failed": "Failed to restart task",
     "processing": "Processing...",
     "targets": "Targets",
     "exit_code": "Exit Code: {{code}}",
@@ -82,12 +129,79 @@
     "scan_results": "Scan Results",
     "results_placeholder": "Results will appear here after completion.",
     "export_report": "Export Report",
+    "export_csv": "Export CSV",
+    "export_json": "Export JSON",
+    "export_success": "Exported {{format}} report",
+    "export_failed": "Failed to export report",
+    "export_no_results": "No result data to export",
     "error_restart_no_targets": "Cannot restart: no targets found",
     "no_results": "No scan results yet",
+    "table_headers": {
+      "ip": "IP",
+      "port": "Port",
+      "protocol": "Proto",
+      "service": "Service",
+      "state": "State"
+    },
+    "result_state": {
+      "open": "Open",
+      "closed": "Closed",
+      "filtered": "Filtered",
+      "unknown": "Unknown"
+    },
+    "loading_task_details": "Loading task details...",
+    "task_not_found": "Task not found",
+    "task_name_label": "Task: {{name}}",
+    "ports_results_title": "Port Details",
+    "overview_title": "Task Overview",
+    "overview_description": "This page shows task summary and quick metrics. Click the colorful cards below to open detailed pages.",
+    "entry_assets_title": "Assets",
+    "entry_assets_desc": "View discovered asset list and host scope",
+    "entry_alive_title": "Alive IP",
+    "entry_alive_desc": "View currently alive hosts",
+    "entry_ports_title": "Port Details",
+    "entry_ports_desc": "View open ports, protocols, and services",
+    "entry_vulns_title": "Vulnerability Details",
+    "entry_vulns_desc": "View vulnerability findings and risk level",
+    "quick_note_title": "Navigation",
+    "quick_note_body": "This is an overview page. For detailed data, click the metric cards above.",
+    "coming_soon": "Coming soon",
     "stat_assets": "Assets",
     "stat_ports": "Ports",
     "stat_services": "Services",
-    "stat_vulns": "Vulns"
+    "stat_vulns": "Vulns",
+    "unknown_service": "Unknown Service",
+    "label_open_ports": "Open Ports",
+    "label_services": "Services",
+    "ports_unique_ports": "Unique Ports",
+    "ports_coverage": "Coverage",
+    "ports_visual_title": "Port Surface Visualization",
+    "ports_visual_desc": "Donut charts for service and port concentration to quickly spot the hottest exposure areas.",
+    "ports_view_services": "Service Distribution",
+    "ports_view_ports": "Port Hotspots",
+    "ports_view_hosts": "Host Matrix",
+    "ports_service_donut_title": "Service Donut",
+    "ports_service_donut_desc": "Tap a segment to filter the table by service.",
+    "ports_service_total": "Service Hits",
+    "ports_port_donut_title": "Port Donut",
+    "ports_port_donut_desc": "Port frequency among current open-port records.",
+    "ports_port_total": "Port Hits",
+    "ports_chart_other": "Other",
+    "ports_search_placeholder": "Filter by IP / port / service / protocol",
+    "ports_filtered_rows": "{{count}} rows matched (total {{total}})",
+    "ports_filter_service": "Service filter:",
+    "no_alive_hosts": "No alive hosts detected yet",
+    "vuln_step_not_enabled": "POC verification is not enabled in this workflow.",
+    "vuln_surface_hint": "Potential exposure surface (based on open services):",
+    "no_structured_vuln_data": "No structured vulnerability records were returned by the current scanner pipeline.",
+    "page_prev": "Prev",
+    "page_next": "Next",
+    "page_info": "Page {{page}} / {{totalPages}}",
+    "vuln_col_severity": "Severity",
+    "vuln_col_title": "Title",
+    "vuln_col_target": "Target",
+    "vuln_col_status": "Status",
+    "vuln_col_evidence": "Evidence"
   },
   "backend_detail": {
     "refresh_metrics": "Refresh Metrics",
@@ -102,14 +216,19 @@
     "no_metrics": "No server metrics available for this backend type.",
     "error_metrics": "Error loading metrics: {{message}}",
     "used": "Used",
-    "total": "Total"
+    "total": "Total",
+    "loading_server_details": "Loading server details...",
+    "server_not_found": "Server not found"
   },
   "servers": {
     "title": "Servers",
     "add": "+ Add",
     "no_backends": "No backends configured.",
     "delete": "Delete",
-    "no_address": "No address"
+    "no_address": "No address",
+    "health_online": "Online",
+    "health_offline": "Offline",
+    "health_unknown": "Unknown"
   },
   "dashboard": {
     "assets": "Assets",
@@ -137,13 +256,41 @@
     "tasks": "Tasks",
     "servers": "Servers",
     "help": "Help",
-    "about": "About PolyScan Pro"
+    "about": "About SuperScanner"
   },
   "activity_bar": {
+    "dashboard": "Dashboard",
     "tasks": "Tasks",
     "servers": "Servers",
+    "language": "Language",
     "light_mode": "Light Mode",
     "dark_mode": "Dark Mode",
     "settings": "Settings"
+  },
+  "settings": {
+    "title": "Settings",
+    "language": "Language",
+    "theme": "Theme",
+    "motion": "Animation Intensity",
+    "motion_full": "Full Motion",
+    "motion_reduced": "Reduced Motion",
+    "default_backend": "Default Backend",
+    "default_backend_auto": "Auto select first available backend"
+  },
+  "task_status": {
+    "unspecified": "Unspecified",
+    "pending": "Pending",
+    "running": "Running",
+    "done": "Done",
+    "failed": "Failed",
+    "stopped": "Stopped",
+    "paused": "Paused"
+  },
+  "titlebar": {
+    "window_controls": {
+      "close": "Close",
+      "minimize": "Minimize",
+      "maximize": "Maximize"
+    }
   }
 }

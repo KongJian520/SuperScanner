@@ -1,13 +1,14 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  Activity, Box, CheckCircle2, Clock, List, PauseCircle,
-  Plus, Server, ShieldAlert, StopCircle, Trash2
+  Activity, Box, CheckCircle2, Clock, PauseCircle,
+  Plus, ShieldAlert, StopCircle, Trash2
 } from 'lucide-react';
 import { TaskStatus } from '../types';
 import { useNavigate, useMatch } from 'react-router-dom';
 import { useAppStore } from '../lib/store';
-import { useBackends, useTasks, useDeleteBackend, useDeleteTask, useTaskEvents } from '../hooks/use-scanner-api';
+import { useBackendHealth, useBackends, useTasks, useDeleteBackend, useDeleteTask, useTaskEvents } from '../hooks/use-scanner-api';
+import { navMotion } from '../lib/motion';
 
 const TaskEventListener: React.FC<{ backendId: string | null; taskId: string }> = ({ backendId, taskId }) => {
   useTaskEvents(backendId, taskId);
@@ -41,9 +42,10 @@ export const SidebarPanel: React.FC = () => {
   const matchTask = useMatch('/task/:id');
   const focusedTaskId = matchTask?.params.id;
 
-  const { isSidebarOpen, activeTab, activeBackendId, activeTaskId, setActiveTaskId, setActiveBackendId } = useAppStore();
+  const { isSidebarOpen, activeTab, activeBackendId, defaultBackendId, activeTaskId, setActiveTaskId, setActiveBackendId, setDefaultBackendId } = useAppStore();
   const { data: backends = [] } = useBackends();
-  const effectiveBackendId = activeBackendId ?? backends.find(b => b.address)?.id ?? null;
+  const { data: backendHealth = {} } = useBackendHealth(backends);
+  const effectiveBackendId = activeBackendId ?? defaultBackendId ?? backends.find(b => b.address)?.id ?? null;
   const { data: tasks = [] } = useTasks(effectiveBackendId);
   const { mutate: deleteBackend } = useDeleteBackend();
   const { mutate: deleteTask } = useDeleteTask();
@@ -51,28 +53,34 @@ export const SidebarPanel: React.FC = () => {
   const tab = activeTab === 'servers' ? 'backends' : 'tasks';
 
   const handleSelectTask = (id: string) => { setActiveTaskId(id); setActiveBackendId(null); navigate(`/task/${id}`); };
-  const handleSelectBackend = (id: string) => { setActiveBackendId(id); setActiveTaskId(null); navigate(`/server/${id}`); };
+  const handleSelectBackend = (id: string) => {
+    setActiveBackendId(id);
+    setDefaultBackendId(id);
+    setActiveTaskId(null);
+    navigate(`/server/${id}`);
+  };
   const handleDeleteTask = (id: string, e: React.MouseEvent) => { e.stopPropagation(); if (effectiveBackendId) deleteTask({ backendId: effectiveBackendId, taskId: id }); };
   const handleDeleteBackend = (id: string, e: React.MouseEvent) => { e.stopPropagation(); deleteBackend(id); };
 
   return (
     <div className={`hidden md:flex h-full shrink-0 overflow-hidden transition-all duration-300 ease-in-out ${isSidebarOpen ? 'w-64' : 'w-0'}`}>
-      <div className="w-64 flex flex-col bg-card border-r border-border h-full">
+      <div className="w-64 flex flex-col bg-card/95 border-r border-border/80 h-full backdrop-blur-md relative overflow-hidden">
+      <span className="pointer-events-none absolute inset-x-0 top-0 h-36 bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.2),transparent_72%)]" />
       {/* Action Area */}
-      <div className="p-4 border-b border-border">
+      <div className="p-4 border-b border-border/80 relative z-10">
         {tab === 'tasks' ? (
-          <button onClick={() => navigate('/tasks/new')} className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground hover:opacity-90 transition-opacity py-2 px-4 rounded-md text-sm font-semibold shadow-sm active:scale-95">
+          <button onClick={() => navigate('/tasks/new')} className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-primary to-cyan-400/90 text-primary-foreground hover:brightness-110 transition-[filter,transform,box-shadow] py-2.5 px-4 rounded-lg text-sm font-semibold shadow-lg shadow-primary/25 active:scale-[0.98] hover:-translate-y-0.5">
             <Plus size={16} /><span>{t('sidebar.new_task')}</span>
           </button>
         ) : (
-          <button onClick={() => navigate('/servers/new')} className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground hover:opacity-90 transition-opacity py-2 px-4 rounded-md text-sm font-semibold shadow-sm active:scale-95">
+          <button onClick={() => navigate('/servers/new')} className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-primary to-cyan-400/90 text-primary-foreground hover:brightness-110 transition-[filter,transform,box-shadow] py-2.5 px-4 rounded-lg text-sm font-semibold shadow-lg shadow-primary/25 active:scale-[0.98] hover:-translate-y-0.5">
             <Plus size={16} /><span>{t('sidebar.add_backend')}</span>
           </button>
         )}
       </div>
 
       {/* List Area */}
-      <div className="flex-1 overflow-y-auto p-2 space-y-1 overflow-x-hidden">
+      <div className="flex-1 overflow-y-auto p-2 space-y-1 overflow-x-hidden relative z-10">
         <div className="px-2 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider whitespace-nowrap">
           {tab === 'tasks' ? t('sidebar.active_tasks') : t('sidebar.configured_engines')}
         </div>
@@ -83,9 +91,21 @@ export const SidebarPanel: React.FC = () => {
           ) : (
             tasks.map((task) => (
               <div key={task.id} onClick={() => handleSelectTask(task.id)} title={task.name}
-                className={`group relative flex items-center justify-between px-3 py-2.5 rounded-md cursor-pointer transition-all border border-transparent overflow-hidden ${activeTaskId === task.id ? 'bg-accent text-foreground border-border shadow-sm' : 'text-muted-foreground hover:bg-accent hover:text-foreground'}`}
+                className={`group relative flex items-center justify-between px-3 py-2.5 rounded-lg cursor-pointer transition-[color,background-color,border-color,box-shadow,transform] border overflow-hidden ${activeTaskId === task.id ? 'bg-primary/10 text-foreground border-primary/30 shadow-[0_10px_24px_rgba(59,130,246,0.18)]' : 'border-transparent text-muted-foreground hover:bg-accent/70 hover:text-foreground hover:border-primary/20 hover:-translate-y-0.5'}`}
+                style={{
+                  transitionDuration: `${navMotion.selection.durationMs}ms`,
+                  transitionTimingFunction: navMotion.selection.easing,
+                }}
               >
-                <div className={`absolute left-0 top-0 bottom-0 transition-all duration-500 pointer-events-none ${getProgressStyles(task.status)}`} style={{ width: `${task.progress}%` }} />
+                <span className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-[radial-gradient(circle_at_left,rgba(56,189,248,0.15),transparent_65%)] pointer-events-none" />
+                <span
+                  className={`absolute left-0.5 top-2 bottom-2 w-0.5 bg-primary rounded-r pointer-events-none z-20 transition-[opacity,transform] ${activeTaskId === task.id ? 'opacity-100 scale-y-100' : 'opacity-0 scale-y-60'}`}
+                  style={{
+                    transitionDuration: `${navMotion.indicator.durationMs}ms`,
+                    transitionTimingFunction: navMotion.indicator.easing,
+                  }}
+                />
+                <div className={`absolute left-0 top-0 bottom-0 z-0 transition-[width,opacity] duration-500 pointer-events-none ${getProgressStyles(task.status)}`} style={{ width: `${task.progress}%` }} />
                 <div className="relative z-10 flex items-center gap-3 overflow-hidden">
                   <StatusIcon status={task.status} />
                   <div className="flex flex-col truncate">
@@ -93,7 +113,7 @@ export const SidebarPanel: React.FC = () => {
                     <span className="text-[10px] opacity-60 truncate">{t('sidebar.targets', { count: task.targets.length })} • {task.progress}%</span>
                   </div>
                 </div>
-                <button onClick={(e) => handleDeleteTask(task.id, e)} className="relative z-10 opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-500/20 hover:text-red-400 rounded-md transition-all" title={t('sidebar.delete_task')}>
+                <button onClick={(e) => handleDeleteTask(task.id, e)} className="relative z-10 opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-500/20 hover:text-red-400 rounded-md transition-[opacity,transform,color,background-color] group-hover:translate-x-0 translate-x-1" title={t('sidebar.delete_task')}>
                   <Trash2 size={14} />
                 </button>
               </div>
@@ -105,16 +125,45 @@ export const SidebarPanel: React.FC = () => {
           ) : (
             backends.map((backend) => (
               <div key={backend.id} onClick={() => handleSelectBackend(backend.id)} title={backend.name}
-                className={`group flex items-center justify-between px-3 py-2.5 rounded-md cursor-pointer transition-all border border-transparent ${activeBackendId === backend.id ? 'bg-accent text-foreground border-border shadow-sm' : 'text-muted-foreground hover:bg-accent hover:text-foreground'}`}
+                className={`group relative overflow-hidden flex items-center justify-between px-3 py-2.5 rounded-lg cursor-pointer transition-[color,background-color,border-color,box-shadow,transform] border ${activeBackendId === backend.id ? 'bg-primary/10 text-foreground border-primary/30 shadow-[0_10px_24px_rgba(59,130,246,0.18)]' : 'border-transparent text-muted-foreground hover:bg-accent/70 hover:text-foreground hover:border-primary/20 hover:-translate-y-0.5'}`}
+                style={{
+                  transitionDuration: `${navMotion.selection.durationMs}ms`,
+                  transitionTimingFunction: navMotion.selection.easing,
+                }}
               >
-                <div className="flex items-center gap-3 overflow-hidden">
+                <span className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-[radial-gradient(circle_at_left,rgba(56,189,248,0.12),transparent_65%)] pointer-events-none" />
+                <span
+                  className={`absolute left-0.5 top-2 bottom-2 w-0.5 bg-primary rounded-r pointer-events-none transition-[opacity,transform] ${activeBackendId === backend.id ? 'opacity-100 scale-y-100' : 'opacity-0 scale-y-60'}`}
+                  style={{
+                    transitionDuration: `${navMotion.indicator.durationMs}ms`,
+                    transitionTimingFunction: navMotion.indicator.easing,
+                  }}
+                />
+                <div className="relative z-10 flex items-center gap-3 overflow-hidden">
                   <div className="shrink-0 text-blue-500"><Box size={16} /></div>
                   <div className="flex flex-col truncate">
                     <span className="font-medium text-sm truncate">{backend.name}</span>
-                    <span className="text-[10px] opacity-60 truncate">{backend.address}</span>
+                    <span className="text-[10px] opacity-60 truncate flex items-center gap-1.5">
+                      <span
+                        className={`inline-block w-1.5 h-1.5 rounded-full ${
+                          backendHealth[backend.id]?.state === 'online'
+                            ? 'bg-emerald-500'
+                            : backendHealth[backend.id]?.state === 'offline'
+                              ? 'bg-destructive'
+                              : 'bg-muted-foreground/60'
+                        }`}
+                      />
+                      <span className="truncate">
+                        {backendHealth[backend.id]?.state === 'online'
+                          ? `${t('servers.health_online')} · ${backendHealth[backend.id]?.latencyMs ?? '-'}ms`
+                          : backendHealth[backend.id]?.state === 'offline'
+                            ? t('servers.health_offline')
+                            : t('servers.health_unknown')}
+                      </span>
+                    </span>
                   </div>
                 </div>
-                <button onClick={(e) => handleDeleteBackend(backend.id, e)} className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-500/20 hover:text-red-400 rounded-md transition-all" title={t('sidebar.delete_backend')}>
+                <button onClick={(e) => handleDeleteBackend(backend.id, e)} className="relative z-10 opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-500/20 hover:text-red-400 rounded-md transition-[opacity,transform,color,background-color] group-hover:translate-x-0 translate-x-1" title={t('sidebar.delete_backend')}>
                   <Trash2 size={14} />
                 </button>
               </div>

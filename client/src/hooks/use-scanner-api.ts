@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import * as api from '../lib/api';
-import { Task, TaskStatus } from '../types';
+import { BackendConfig, Task, TaskStatus } from '../types';
 import { toast } from 'sonner';
 
 // --- Backends ---
@@ -78,7 +78,7 @@ export function useTasks(backendId: string | null) {
       return newTasks.map(nt => {
         const ot = oldTasks.find(t => t.id === nt.id);
         if (!ot) return nt;
-        if (nt.status === TaskStatus.RUNNING || nt.status === TaskStatus.PENDING) {
+        if (nt.status === TaskStatus.RUNNING) {
           return { ...nt, progress: Math.max(nt.progress, ot.progress) };
         }
         return nt;
@@ -90,25 +90,30 @@ export function useTasks(backendId: string | null) {
   });
 }
 
+function stabilizeProgress(current: number, incoming: number, status: TaskStatus): number {
+  if (status === TaskStatus.DONE) return 100;
+  if (status === TaskStatus.RUNNING) return Math.max(current, incoming);
+  if (status === TaskStatus.PENDING) return 0;
+  return incoming;
+}
+
 // Helper to apply event updates to a task
 function applyTaskUpdate(t: Task, payload: any): Task {
   if (payload.type === 'Progress') {
-    return { ...t, progress: payload.payload.percent };
+    return {
+      ...t,
+      progress: stabilizeProgress(t.progress, payload.payload.percent, t.status),
+    };
   }
   if (payload.type === 'TaskSnapshot') {
     const snap = payload.payload;
-    let newProgress = snap.progress ?? t.progress;
-    if (snap.status === TaskStatus.RUNNING && newProgress === 0 && t.progress > 0) {
-      newProgress = t.progress;
-    } else if (snap.status === TaskStatus.DONE) {
-      newProgress = 100;
-    } else if (snap.status === TaskStatus.PENDING) {
-      newProgress = 0;
-    }
+    const nextStatus = snap.status ?? t.status;
+    const incomingProgress = snap.progress ?? t.progress;
+    const newProgress = stabilizeProgress(t.progress, incomingProgress, nextStatus);
     const parseTs = (ts: any) => typeof ts === 'string' ? Date.parse(ts) : (typeof ts === 'number' ? ts : undefined);
     return {
       ...t,
-      status: snap.status,
+      status: nextStatus,
       progress: newProgress,
       exitCode: snap.exit_code,
       errorMessage: snap.error_message,
@@ -197,6 +202,7 @@ export function useTaskEvents(backendId: string | null, taskId: string | null) {
 export function useTaskDetail(backendId: string | null, taskId: string | null) {
   const { data: backends } = useBackends();
   const backend = backends?.find((b) => b.id === backendId);
+  const queryClient = useQueryClient();
 
   return useQuery({
     queryKey: ['task', backendId, taskId],
@@ -204,7 +210,13 @@ export function useTaskDetail(backendId: string | null, taskId: string | null) {
       if (!backend?.address || !taskId) throw new Error('Invalid context');
       const res = await api.getTask(backend.address, taskId, !!backend.useTls);
       if (!res.ok) throw new Error(res.error);
-      return { ...res.data, backendId: backend.id };
+      const next = { ...res.data, backendId: backend.id };
+      const prev = queryClient.getQueryData<Task>(['task', backendId, taskId]);
+      if (!prev) return next;
+      return {
+        ...next,
+        progress: stabilizeProgress(prev.progress, next.progress, next.status),
+      };
     },
     enabled: !!backend?.address && !!taskId,
     refetchInterval: (query) => {
@@ -338,5 +350,36 @@ export function useServerInfo(backendId: string | null) {
     },
     enabled: !!backend?.address,
     refetchInterval: 10000,
+  });
+}
+
+export type BackendHealthState = 'online' | 'offline' | 'unknown';
+export interface BackendHealthSnapshot {
+  state: BackendHealthState;
+  latencyMs: number | null;
+  checkedAt: number;
+}
+
+export function useBackendHealth(backends: BackendConfig[]) {
+  return useQuery({
+    queryKey: ['backend-health', backends.map((b) => `${b.id}:${b.address}:${b.useTls ? '1' : '0'}`)],
+    queryFn: async () => {
+      const entries = await Promise.all(backends.map(async (backend) => {
+        if (!backend.address) {
+          return [backend.id, { state: 'unknown', latencyMs: null, checkedAt: Date.now() } satisfies BackendHealthSnapshot] as const;
+        }
+        const start = performance.now();
+        const res = await api.getServerInfo(backend.address, !!backend.useTls);
+        const latency = Math.max(1, Math.round(performance.now() - start));
+        if (!res.ok) {
+          return [backend.id, { state: 'offline', latencyMs: null, checkedAt: Date.now() } satisfies BackendHealthSnapshot] as const;
+        }
+        return [backend.id, { state: 'online', latencyMs: latency, checkedAt: Date.now() } satisfies BackendHealthSnapshot] as const;
+      }));
+      return Object.fromEntries(entries) as Record<string, BackendHealthSnapshot>;
+    },
+    enabled: backends.length > 0,
+    staleTime: 1000 * 10,
+    refetchInterval: 1000 * 15,
   });
 }

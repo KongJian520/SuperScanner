@@ -1,25 +1,32 @@
 import React from 'react';
-import { useParams, Navigate } from 'react-router-dom';
+import { Navigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { AnimatePresence, motion } from 'framer-motion';
-import { TaskDetail } from '@/views/TaskDetail';
 import { useTaskDetail, useBackends, useTaskEvents } from '../hooks/use-scanner-api';
 import { useAppStore } from '../lib/store';
+import { TaskDetail, TaskDetailSection } from '../views/TaskDetail';
 import { routeLite, stateTransition } from '../lib/motion';
 
-export const TaskDetailRoute: React.FC = () => {
+const isTaskDetailSection = (section: string): section is TaskDetailSection => (
+  section === 'assets' || section === 'alive' || section === 'ports' || section === 'vulns'
+);
+
+export const TaskResultRoute: React.FC = () => {
   const { t } = useTranslation();
-  const { id } = useParams();
+  const { id, section } = useParams();
   const { activeBackendId, defaultBackendId } = useAppStore();
   const { data: backends } = useBackends();
-  
+
   const effectiveBackendId = activeBackendId ?? defaultBackendId ?? backends?.find(b => b.address)?.id ?? null;
   const { data: task, isLoading, error } = useTaskDetail(effectiveBackendId, id ?? null);
-  
-  // Enable real-time updates for this task
+
   useTaskEvents(effectiveBackendId, id ?? null);
-  
-  if (!id) return <Navigate to="/tasks" replace />;
+
+  if (!id || !section) return <Navigate to="/tasks" replace />;
+  if (!isTaskDetailSection(section)) {
+    return <Navigate to={`/task/${id}`} replace />;
+  }
+
   return (
     <div className="h-full">
       <AnimatePresence mode="wait" initial={false}>
@@ -74,7 +81,7 @@ export const TaskDetailRoute: React.FC = () => {
             animate="animate"
             exit="exit"
           >
-            <TaskDetail task={task} />
+            <TaskDetail task={task} activeSection={section} />
           </motion.div>
         )}
       </AnimatePresence>
@@ -82,4 +89,4 @@ export const TaskDetailRoute: React.FC = () => {
   );
 };
 
-export default TaskDetailRoute;
+export default TaskResultRoute;

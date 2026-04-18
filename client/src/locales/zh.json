@@ -1,4 +1,7 @@
 {
+  "app": {
+    "name": "SuperScanner"
+  },
   "common": {
     "loading": "加载中...",
     "error": "发生错误",
@@ -8,8 +11,13 @@
     "edit": "编辑",
     "create": "创建",
     "confirm": "确认",
+    "back": "返回",
     "no_data": "暂无数据",
-    "no_address": "无地址"
+    "na": "N/A",
+    "no_address": "无地址",
+    "chinese": "中文",
+    "english": "English"
+    ,"clear": "清除"
   },
   "sidebar": {
     "tasks": "任务",
@@ -29,6 +37,29 @@
     "loading": "加载任务中...",
     "empty": "暂无任务。创建一个以开始。"
   },
+  "tasks_overview": {
+    "dashboard_title": "任务指挥面板",
+    "dashboard_subtitle": "总览优先，快速把握任务态势并直达任务操作。",
+    "total_tasks": "任务总数",
+    "running_tasks": "运行中",
+    "completed_tasks": "已完成",
+    "failed_tasks": "异常/中断",
+    "avg_progress": "平均进度",
+    "total_targets": "总目标 {{count}}",
+    "open_task_list": "下方列表可直接管理任务",
+    "list_title": "任务列表",
+    "list_subtitle": "点击进入详情，悬停行可快速删除",
+    "recent_update": "最近更新：{{name}}",
+    "no_backend_hint": "未检测到可用后端，请先添加服务器",
+    "total_targets_short": "目标 {{count}}",
+    "avg_progress_short": "进度 {{percent}}%",
+    "latest_short": "更新：{{name}}",
+    "manage_short": "可在列表管理",
+    "backend_hint_short": "请先添加后端",
+    "filter_all": "全部",
+    "search_placeholder": "按任务名、描述或目标搜索",
+    "no_filter_match": "当前筛选条件下没有匹配任务。"
+  },
   "create_task": {
     "title": "新建扫描任务",
     "description": "配置目标并选择后端引擎执行扫描。",
@@ -41,10 +72,25 @@
     "desc_placeholder": "可选描述",
     "select_backend": "选择后端引擎",
     "no_backends": "无可用后端。请先添加服务器。",
+    "workflow_title": "工作流配置",
+    "workflow_port_scan": "端口扫描",
+    "workflow_fingerprint": "指纹识别",
+    "workflow_poc_verify": "POC 验证",
+    "tool_builtin": "内置",
+    "tool_nmap": "Nmap",
+    "tool_httpx": "HTTPX",
+    "tool_nuclei": "Nuclei",
     "cancel": "取消",
     "start_scan": "开始扫描",
     "creating": "创建中...",
-    "error_select_backend": "请选择一个后端引擎"
+    "error_select_backend": "请选择一个后端引擎",
+    "error_select_port_tool": "请至少选择一个端口扫描工具",
+    "error_select_fingerprint_tool": "请至少选择一个指纹识别工具",
+    "error_select_poc_tool": "请至少选择一个 POC 工具",
+    "error_select_workflow_step": "请至少启用一个工作流步骤",
+    "nmap_server_hint": "工具发现优先级：环境变量 > server-config.toml > 系统 PATH；未发现的工具不会显示。",
+    "tool_unavailable": "当前后端未发现该工具，请先在服务端配置后刷新。",
+    "default_name": "扫描 {{target}}"
   },
   "new_backend": {
     "title": "添加新后端",
@@ -73,6 +119,7 @@
     "stop": "停止",
     "restart": "重启",
     "restart_success": "任务已重启",
+    "restart_failed": "重启任务失败",
     "processing": "处理中...",
     "targets": "目标",
     "exit_code": "退出代码: {{code}}",
@@ -82,12 +129,79 @@
     "scan_results": "扫描结果",
     "results_placeholder": "完成后结果将显示在此处。",
     "export_report": "导出报告",
+    "export_csv": "导出 CSV",
+    "export_json": "导出 JSON",
+    "export_success": "已导出 {{format}} 报告",
+    "export_failed": "导出报告失败",
+    "export_no_results": "暂无可导出的结果数据",
     "error_restart_no_targets": "无法重启：未找到目标",
     "no_results": "暂无扫描结果",
+    "table_headers": {
+      "ip": "IP",
+      "port": "端口",
+      "protocol": "协议",
+      "service": "服务",
+      "state": "状态"
+    },
+    "result_state": {
+      "open": "开放",
+      "closed": "关闭",
+      "filtered": "过滤",
+      "unknown": "未知"
+    },
+    "loading_task_details": "加载任务详情中...",
+    "task_not_found": "任务不存在",
+    "task_name_label": "任务：{{name}}",
+    "ports_results_title": "端口详情",
+    "overview_title": "任务概览",
+    "overview_description": "此页面展示任务概览与关键指标。点击下方彩色卡片进入对应详细页面。",
+    "entry_assets_title": "资产",
+    "entry_assets_desc": "查看发现的资产列表与主机范围",
+    "entry_alive_title": "存活 IP",
+    "entry_alive_desc": "查看当前存活主机",
+    "entry_ports_title": "端口详情",
+    "entry_ports_desc": "查看开放端口、协议与服务信息",
+    "entry_vulns_title": "漏洞详情",
+    "entry_vulns_desc": "查看漏洞发现与风险等级",
+    "quick_note_title": "导航说明",
+    "quick_note_body": "当前为概览页面。详细数据请点击上方指标卡片进入。",
+    "coming_soon": "即将上线",
     "stat_assets": "资产",
     "stat_ports": "端口",
     "stat_services": "服务",
-    "stat_vulns": "漏洞"
+    "stat_vulns": "漏洞",
+    "unknown_service": "未知服务",
+    "label_open_ports": "开放端口",
+    "label_services": "服务数",
+    "ports_unique_ports": "唯一端口",
+    "ports_coverage": "覆盖率",
+    "ports_visual_title": "端口暴露可视化",
+    "ports_visual_desc": "用服务与端口空心饼图快速观察暴露热点分布。",
+    "ports_view_services": "服务分布",
+    "ports_view_ports": "端口热度",
+    "ports_view_hosts": "主机矩阵",
+    "ports_service_donut_title": "服务空心饼图",
+    "ports_service_donut_desc": "点击分段可按服务筛选下方结果表。",
+    "ports_service_total": "服务命中",
+    "ports_port_donut_title": "端口空心饼图",
+    "ports_port_donut_desc": "展示当前开放端口记录中的端口频次。",
+    "ports_port_total": "端口命中",
+    "ports_chart_other": "其他",
+    "ports_search_placeholder": "按 IP / 端口 / 服务 / 协议筛选",
+    "ports_filtered_rows": "匹配 {{count}} 行（总计 {{total}}）",
+    "ports_filter_service": "服务筛选：",
+    "no_alive_hosts": "暂未发现存活主机",
+    "vuln_step_not_enabled": "当前工作流未启用 POC 漏洞验证步骤。",
+    "vuln_surface_hint": "潜在暴露面（基于开放服务）：",
+    "no_structured_vuln_data": "当前扫描链路未返回结构化漏洞记录。",
+    "page_prev": "上一页",
+    "page_next": "下一页",
+    "page_info": "第 {{page}} / {{totalPages}} 页",
+    "vuln_col_severity": "严重级别",
+    "vuln_col_title": "标题",
+    "vuln_col_target": "目标",
+    "vuln_col_status": "状态",
+    "vuln_col_evidence": "证据"
   },
   "backend_detail": {
     "refresh_metrics": "刷新指标",
@@ -102,14 +216,19 @@
     "no_metrics": "该后端暂无服务器指标。",
     "error_metrics": "加载指标失败：{{message}}",
     "used": "已用",
-    "total": "总计"
+    "total": "总计",
+    "loading_server_details": "加载服务器详情中...",
+    "server_not_found": "服务器不存在"
   },
   "servers": {
     "title": "服务器",
     "add": "+ 添加",
     "no_backends": "未配置后端。",
     "delete": "删除",
-    "no_address": "无地址"
+    "no_address": "无地址",
+    "health_online": "在线",
+    "health_offline": "离线",
+    "health_unknown": "未知"
   },
   "dashboard": {
     "assets": "资产",
@@ -137,13 +256,41 @@
     "tasks": "任务",
     "servers": "服务器",
     "help": "帮助",
-    "about": "关于 PolyScan Pro"
+    "about": "关于 SuperScanner"
   },
   "activity_bar": {
+    "dashboard": "总览",
     "tasks": "任务",
     "servers": "服务器",
+    "language": "语言",
     "light_mode": "浅色模式",
     "dark_mode": "深色模式",
     "settings": "设置"
+  },
+  "settings": {
+    "title": "设置",
+    "language": "语言",
+    "theme": "主题",
+    "motion": "动画强度",
+    "motion_full": "完整动画",
+    "motion_reduced": "降低动画",
+    "default_backend": "默认后端",
+    "default_backend_auto": "自动选择第一个可用后端"
+  },
+  "task_status": {
+    "unspecified": "未指定",
+    "pending": "等待中",
+    "running": "运行中",
+    "done": "已完成",
+    "failed": "失败",
+    "stopped": "已停止",
+    "paused": "已暂停"
+  },
+  "titlebar": {
+    "window_controls": {
+      "close": "关闭",
+      "minimize": "最小化",
+      "maximize": "最大化"
+    }
   }
 }

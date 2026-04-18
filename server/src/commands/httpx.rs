@@ -5,7 +5,16 @@ use async_trait::async_trait;
 use sqlx::sqlite::SqlitePool;
 use std::path::PathBuf;
 
-pub struct HttpxCommand;
+#[derive(Clone)]
+pub struct HttpxCommand {
+    binary: String,
+}
+
+impl HttpxCommand {
+    pub fn new(binary: String) -> Self {
+        Self { binary }
+    }
+}
 
 #[async_trait]
 impl ScannerCommand for HttpxCommand {
@@ -20,7 +29,7 @@ impl ScannerCommand for HttpxCommand {
     fn build_spec(&self, targets: &[String], args: &[String]) -> CommandSpec {
         CommandSpec {
             id: "httpx".to_string(),
-            program: PathBuf::from("httpx"),
+            program: PathBuf::from(&self.binary),
             args: args.to_vec(),
             targets: targets.to_vec(),
             env: None,
@@ -46,6 +55,6 @@ impl ScannerCommand for HttpxCommand {
     }
 
     fn box_clone(&self) -> Box<dyn ScannerCommand> {
-        Box::new(HttpxCommand)
+        Box::new(self.clone())
     }
 }

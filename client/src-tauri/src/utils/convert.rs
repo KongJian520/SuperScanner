@@ -17,6 +17,12 @@ pub fn server_info_from_proto(p: server_info_proto::ServerInfoResponse) -> Serve
         load_average: p.load_average,
         disk_total_bytes: Some(p.disk_total_bytes),
         disk_free_bytes: Some(p.disk_free_bytes),
+        tools: p.tools.into_iter().map(|t| ToolCapabilityDto {
+            tool_id: t.tool_id,
+            available: t.available,
+            source: t.source,
+            path: t.path,
+        }).collect(),
     }
 }
 

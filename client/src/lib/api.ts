@@ -36,6 +36,7 @@ function mapRawToTask(raw: any): Task {
         progress,
         workflow: raw?.workflow ?? { steps: [] },
         results: raw?.results ?? [],
+        vulnerabilities: raw?.vulnerabilities ?? [],
     };
 }
 
@@ -167,6 +168,14 @@ export function normalizeServerInfoDto(raw: any): ServerInfo {
         loadAverage: Array.isArray(raw?.loadAverage) ? raw.loadAverage.map((x: any) => toNumber(x)) : [],
         diskTotalBytes: toNumber(raw?.diskTotalBytes),
         diskFreeBytes: toNumber(raw?.diskFreeBytes),
+        tools: Array.isArray(raw?.tools)
+            ? raw.tools.map((tool: any) => ({
+                toolId: tool?.toolId ?? '',
+                available: !!tool?.available,
+                source: tool?.source ?? '',
+                path: tool?.path ?? '',
+            }))
+            : [],
     };
 }
 

@@ -1,191 +1,327 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Task, TaskStatus, ScanResult } from '../types';
+import { Link } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import { Task, TaskStatus } from '../types';
 import { toast } from 'sonner';
-import { AlertOctagon, ArrowUpDown, Clock, Info, Play, Square } from 'lucide-react';
+import { AlertOctagon, Check, Clock, Download, Play, Square, X } from 'lucide-react';
 import { useStartTask, useStopTask, useBackends } from '../hooks/use-scanner-api';
 import * as api from '../lib/api';
 
 import { TaskStatusBadge } from '../components/TaskStatusBadge';
-import DashboardGrid from '../components/DashboardGrid';
+import { microInteraction } from '../lib/motion';
+import TaskPortsDetail from './TaskPortsDetail';
+import TaskResultPlaceholderDetail from './TaskResultPlaceholderDetail';
+
+export type TaskDetailSection = 'assets' | 'alive' | 'ports' | 'vulns';
 
 interface TaskDetailProps {
   task: Task;
+  activeSection?: TaskDetailSection;
 }
-
-type SortKey = keyof Pick<ScanResult, 'ip' | 'port' | 'protocol' | 'service' | 'state'>;
-type SortDir = 'asc' | 'desc';
 
 const getProgressColor = (status: TaskStatus) => {
   switch (status) {
-    case TaskStatus.DONE:    return 'bg-green-500/20';
-    case TaskStatus.FAILED:  return 'bg-red-500/20';
+    case TaskStatus.DONE: return 'bg-green-500/20';
+    case TaskStatus.FAILED: return 'bg-red-500/20';
     case TaskStatus.STOPPED: return 'bg-orange-500/20';
     case TaskStatus.RUNNING: return 'bg-blue-500/20';
-    default:                 return 'bg-muted/30';
+    default: return 'bg-muted/30';
   }
 };
 
-const ResultsTable: React.FC<{ results: ScanResult[] }> = ({ results }) => {
-  const { t } = useTranslation();
-  const [sortKey, setSortKey] = useState<SortKey>('ip');
-  const [sortDir, setSortDir] = useState<SortDir>('asc');
-
-  const sorted = useMemo(() => {
-    return [...results].sort((a, b) => {
-      const av = sortKey === 'port' ? a.port : String(a[sortKey] ?? '');
-      const bv = sortKey === 'port' ? b.port : String(b[sortKey] ?? '');
-      if (av < bv) return sortDir === 'asc' ? -1 : 1;
-      if (av > bv) return sortDir === 'asc' ? 1 : -1;
-      return 0;
-    });
-  }, [results, sortKey, sortDir]);
-
-  const toggleSort = (key: SortKey) => {
-    if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
-    else { setSortKey(key); setSortDir('asc'); }
-  };
-
-  const Th: React.FC<{ col: SortKey; label: string }> = ({ col, label }) => (
-    <th
-      className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide cursor-pointer select-none hover:text-foreground transition-colors whitespace-nowrap"
-      onClick={() => toggleSort(col)}
-    >
-      <span className="flex items-center gap-1">
-        {label}
-        <ArrowUpDown size={10} className={sortKey === col ? 'text-primary' : 'opacity-40'} />
-      </span>
-    </th>
-  );
-
-  const stateColor = (state: string) => {
-    if (state === 'open') return 'text-green-500';
-    if (state === 'closed') return 'text-red-400';
-    return 'text-muted-foreground';
-  };
-
-  return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm border-collapse min-w-[480px]">
-        <thead>
-          <tr className="border-b border-border">
-            <Th col="ip" label="IP" />
-            <Th col="port" label="Port" />
-            <Th col="protocol" label="Proto" />
-            <Th col="service" label="Service" />
-            <Th col="state" label="State" />
-          </tr>
-        </thead>
-        <tbody>
-          {sorted.map((r, i) => (
-            <tr key={i} className="border-b border-border/50 hover:bg-accent/50 transition-colors">
-              <td className="px-3 py-2 font-mono text-xs text-foreground">{r.ip}</td>
-              <td className="px-3 py-2 font-mono text-xs text-foreground">{r.port}</td>
-              <td className="px-3 py-2 text-xs text-muted-foreground uppercase">{r.protocol}</td>
-              <td className="px-3 py-2 text-xs text-foreground">{r.service || '-'}</td>
-              <td className={`px-3 py-2 text-xs font-medium ${stateColor(r.state)}`}>{r.state}</td>
-            </tr>
-          ))}
-          {sorted.length === 0 && (
-            <tr>
-      <td colSpan={5} className="px-3 py-8 text-center text-muted-foreground text-sm">{t('task_detail.no_results')}</td>
-            </tr>
-          )}
-        </tbody>
-      </table>
-    </div>
-  );
+const downloadTextFile = (content: string, fileName: string, mimeType: string) => {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = fileName;
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  URL.revokeObjectURL(url);
 };
 
-export const TaskDetail: React.FC<TaskDetailProps> = ({ task }) => {
+const toCsv = (rows: Record<string, unknown>[]) => {
+  if (rows.length === 0) return '';
+  const columns = Object.keys(rows[0]);
+  const escape = (value: unknown) => {
+    const raw = value == null ? '' : String(value);
+    if (raw.includes('"') || raw.includes(',') || raw.includes('\n')) {
+      return `"${raw.replace(/"/g, '""')}"`;
+    }
+    return raw;
+  };
+  const header = columns.join(',');
+  const data = rows.map((row) => columns.map((column) => escape(row[column])).join(',')).join('\n');
+  return `${header}\n${data}`;
+};
+
+type ActionFeedback = 'idle' | 'loading' | 'success' | 'error';
+type ActionKey = 'start' | 'stop' | 'restart';
+
+export const TaskDetail: React.FC<TaskDetailProps> = ({ task, activeSection = 'assets' }) => {
   const { t } = useTranslation();
   const { mutate: startTask, isPending: isStarting } = useStartTask();
   const { mutate: stopTask, isPending: isStopping } = useStopTask();
   const { data: backends = [] } = useBackends();
+  const [feedback, setFeedback] = useState<Record<ActionKey, ActionFeedback>>({
+    start: 'idle',
+    stop: 'idle',
+    restart: 'idle',
+  });
+  const resetTimers = useRef<Partial<Record<ActionKey, number>>>({});
+
+  useEffect(() => {
+    return () => {
+      Object.values(resetTimers.current).forEach((timerId) => {
+        if (timerId) window.clearTimeout(timerId);
+      });
+    };
+  }, []);
+
+  const setActionFeedback = (action: ActionKey, state: ActionFeedback) => {
+    const timerId = resetTimers.current[action];
+    if (timerId) window.clearTimeout(timerId);
+    setFeedback((prev) => ({ ...prev, [action]: state }));
+    if (state === 'success' || state === 'error') {
+      resetTimers.current[action] = window.setTimeout(() => {
+        setFeedback((prev) => ({ ...prev, [action]: 'idle' }));
+      }, 1400);
+    }
+  };
+
+  const renderActionIcon = (action: ActionKey, fallback: React.ReactNode) => {
+    if (feedback[action] === 'loading') {
+      return <span className="w-4 h-4 border-2 border-current/30 border-t-current rounded-full animate-spin" />;
+    }
+    if (feedback[action] === 'success') return <Check size={14} />;
+    if (feedback[action] === 'error') return <X size={14} />;
+    return fallback;
+  };
+
+  const results = task.results || [];
+  const openResults = results.filter((r) => r.state?.toLowerCase() === 'open');
 
   const handleStart = () => {
-    if (task.backendId) startTask({ backendId: task.backendId, taskId: task.id });
+    if (!task.backendId) return;
+    setActionFeedback('start', 'loading');
+    startTask(
+      { backendId: task.backendId, taskId: task.id },
+      {
+        onSuccess: () => setActionFeedback('start', 'success'),
+        onError: () => setActionFeedback('start', 'error'),
+      },
+    );
   };
 
   const handleStop = () => {
-    if (task.backendId) stopTask({ backendId: task.backendId, taskId: task.id });
+    if (!task.backendId) return;
+    setActionFeedback('stop', 'loading');
+    stopTask(
+      { backendId: task.backendId, taskId: task.id },
+      {
+        onSuccess: () => setActionFeedback('stop', 'success'),
+        onError: () => setActionFeedback('stop', 'error'),
+      },
+    );
   };
 
   const handleRestart = async () => {
     if (!task.backendId) return;
-    const backend = backends.find(b => b.id === task.backendId);
+    const backend = backends.find((b) => b.id === task.backendId);
     if (!backend?.address) return;
+    setActionFeedback('restart', 'loading');
     try {
       const res = await api.restartScan(backend.address, task.id, !!backend.useTls);
-      if (!res.ok) { toast.error(res.error || '重启任务失败'); return; }
+      if (!res.ok) {
+        setActionFeedback('restart', 'error');
+        toast.error(res.error || t('task_detail.restart_failed'));
+        return;
+      }
+      setActionFeedback('restart', 'success');
       toast.success(t('task_detail.restart_success'));
-    } catch (e) { console.error(e); }
+    } catch (e) {
+      setActionFeedback('restart', 'error');
+      console.error(e);
+    }
+  };
+
+  const handleExport = (format: 'csv' | 'json') => {
+    if (!results.length) {
+      toast.error(t('task_detail.export_no_results'));
+      return;
+    }
+    try {
+      const exportRows = results.map((row) => {
+        const raw = row as unknown as Record<string, unknown>;
+        return {
+          ip: row.ip ?? '',
+          port: row.port ?? '',
+          protocol: row.protocol ?? '',
+          service: row.service ?? '',
+          state: row.state ?? '',
+          severity: raw.severity ?? '',
+          vulnerabilityId: raw.vulnerabilityId ?? '',
+          title: raw.title ?? '',
+          evidence: raw.evidence ?? '',
+          timestamp: row.timestamp ?? '',
+        };
+      });
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const filePrefix = `task-${task.id}-report-${stamp}`;
+      if (format === 'csv') {
+        downloadTextFile(toCsv(exportRows), `${filePrefix}.csv`, 'text/csv;charset=utf-8;');
+      } else {
+        downloadTextFile(JSON.stringify(exportRows, null, 2), `${filePrefix}.json`, 'application/json;charset=utf-8;');
+      }
+      toast.success(t('task_detail.export_success', { format: format.toUpperCase() }));
+    } catch {
+      toast.error(t('task_detail.export_failed'));
+    }
   };
 
   const isToggling = isStarting || isStopping;
-  const results = task.results || [];
+  const assetsCount = new Set(results.map((r) => r.ip).filter(Boolean)).size;
+  const aliveCount = new Set(openResults.map((r) => r.ip).filter(Boolean)).size;
+  const portsCount = openResults.length;
+  const vulnsCount = (task.vulnerabilities?.length ?? 0) + results.filter((row) => {
+    const raw = row as unknown as Record<string, unknown>;
+    return Boolean(raw.severity || raw.vulnerabilityId || raw.vuln || raw.vulnerability);
+  }).length;
+
+  const tabs: Array<{ section: TaskDetailSection; title: string; count: number; activeClass: string }> = [
+    {
+      section: 'assets',
+      title: t('task_detail.entry_assets_title'),
+      count: assetsCount,
+      activeClass: 'from-blue-500/70 to-cyan-500/70 border-blue-300/40',
+    },
+    {
+      section: 'alive',
+      title: t('task_detail.entry_alive_title'),
+      count: aliveCount,
+      activeClass: 'from-emerald-500/70 to-green-500/70 border-emerald-300/40',
+    },
+    {
+      section: 'ports',
+      title: t('task_detail.entry_ports_title'),
+      count: portsCount,
+      activeClass: 'from-violet-500/70 to-fuchsia-500/70 border-violet-300/40',
+    },
+    {
+      section: 'vulns',
+      title: t('task_detail.entry_vulns_title'),
+      count: vulnsCount,
+      activeClass: 'from-rose-500/75 to-red-500/75 border-rose-300/40',
+    },
+  ];
 
   return (
     <div className="h-full flex flex-col">
-      {/* Header */}
-      <div className="relative overflow-hidden p-4 md:p-6 border-b border-border bg-card/50 flex items-center justify-between gap-4">
+      <div className="relative overflow-hidden p-3 sm:p-4 md:p-6 border-b border-border bg-card/60 backdrop-blur-sm flex flex-col items-stretch sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
         <div
           className={`absolute left-0 top-0 bottom-0 transition-all duration-700 ease-out pointer-events-none ${getProgressColor(task.status)}`}
           style={{ width: `${task.progress}%` }}
         />
-        <div className="relative z-10 min-w-0">
+        <div className="absolute inset-0 pointer-events-none opacity-20 bg-[radial-gradient(circle_at_20%_20%,rgba(59,130,246,0.35),transparent_55%)]" />
+        <div className="relative z-10 min-w-0 w-full">
           <div className="flex items-center gap-3 mb-1">
-            <h2 className="text-xl font-bold text-foreground truncate">{task.name}</h2>
+            <h2 className="text-lg sm:text-xl font-bold text-foreground truncate">{task.name}</h2>
             <TaskStatusBadge status={task.status} />
           </div>
-          {task.description && (
-            <p className="text-sm text-muted-foreground italic truncate">"{task.description}"</p>
-          )}
+          <p className="min-h-5 text-sm text-muted-foreground italic truncate">
+            {task.description ? `"${task.description}"` : t('common.na')}
+          </p>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground font-mono mt-1">
             <span className="flex items-center gap-1">
               <Clock size={12} />
-              {t('task_detail.created', { time: task.createdAt ? new Date(task.createdAt).toLocaleTimeString() : '-' })}
+              {t('task_detail.created', { time: task.createdAt ? new Date(task.createdAt).toLocaleTimeString() : t('common.na') })}
             </span>
-            {task.finishedAt && (
-              <span className="flex items-center gap-1">
-                {t('task_detail.end', { time: new Date(task.finishedAt).toLocaleTimeString() })}
-              </span>
-            )}
+            <span className="flex items-center gap-1">
+              {t('task_detail.end', { time: task.finishedAt ? new Date(task.finishedAt).toLocaleTimeString() : t('common.na') })}
+            </span>
           </div>
         </div>
 
-        <div className="flex gap-2 relative z-10 flex-shrink-0">
+        <div className="flex flex-wrap gap-2 relative z-10 w-full sm:w-auto sm:justify-end">
           {(task.status === TaskStatus.PENDING || task.status === TaskStatus.PAUSED) && (
-            <button
-              onClick={handleStart} disabled={isToggling}
-              className="flex items-center gap-2 px-3 py-1.5 bg-primary text-primary-foreground text-sm font-semibold rounded-md hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+            <motion.button
+              onClick={handleStart}
+              disabled={isToggling}
+              whileTap={{ scale: microInteraction.actionButtonPress.scale }}
+              transition={{ duration: microInteraction.actionButtonPress.duration, ease: microInteraction.actionButtonPress.ease }}
+              className={`flex items-center gap-2 px-3 py-1.5 text-sm font-semibold rounded-md border transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                feedback.start === 'success'
+                  ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40'
+                  : feedback.start === 'error'
+                    ? 'bg-destructive/15 text-destructive border-destructive/40'
+                    : 'bg-primary text-primary-foreground border-primary/50 hover:opacity-90'
+              }`}
             >
-              {isStarting ? <span className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" /> : <Play size={14} fill="currentColor" />}
-              <span className="hidden sm:inline">{t('task_detail.start')}</span>
-            </button>
+              {renderActionIcon('start', <Play size={14} fill="currentColor" />)}
+              <span>{t('task_detail.start')}</span>
+            </motion.button>
           )}
           {task.status === TaskStatus.RUNNING && (
-            <button
-              onClick={handleStop} disabled={isToggling}
-              className="flex items-center gap-2 px-3 py-1.5 bg-destructive/20 text-destructive border border-destructive/30 text-sm font-semibold rounded-md hover:bg-destructive/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            <motion.button
+              onClick={handleStop}
+              disabled={isToggling}
+              whileTap={{ scale: microInteraction.actionButtonPress.scale }}
+              transition={{ duration: microInteraction.actionButtonPress.duration, ease: microInteraction.actionButtonPress.ease }}
+              className={`flex items-center gap-2 px-3 py-1.5 text-sm font-semibold rounded-md border transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                feedback.stop === 'success'
+                  ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40'
+                  : feedback.stop === 'error'
+                    ? 'bg-destructive/15 text-destructive border-destructive/40'
+                    : 'bg-destructive/20 text-destructive border-destructive/30 hover:bg-destructive/30'
+              }`}
             >
-              {isStopping ? <span className="w-4 h-4 border-2 border-destructive/30 border-t-destructive rounded-full animate-spin" /> : <Square size={14} fill="currentColor" />}
-              <span className="hidden sm:inline">{t('task_detail.stop')}</span>
-            </button>
+              {renderActionIcon('stop', <Square size={14} fill="currentColor" />)}
+              <span>{t('task_detail.stop')}</span>
+            </motion.button>
           )}
-          {(task.status === TaskStatus.DONE || task.status === TaskStatus.FAILED) && (
-            <button
-              onClick={handleRestart} disabled={isToggling}
-              className="flex items-center gap-2 px-3 py-1.5 bg-primary text-primary-foreground text-sm font-semibold rounded-md hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+          {(task.status === TaskStatus.DONE || task.status === TaskStatus.FAILED || task.status === TaskStatus.STOPPED) && (
+            <motion.button
+              onClick={handleRestart}
+              disabled={isToggling}
+              whileTap={{ scale: microInteraction.actionButtonPress.scale }}
+              transition={{ duration: microInteraction.actionButtonPress.duration, ease: microInteraction.actionButtonPress.ease }}
+              className={`flex items-center gap-2 px-3 py-1.5 text-sm font-semibold rounded-md border transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                feedback.restart === 'success'
+                  ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40'
+                  : feedback.restart === 'error'
+                    ? 'bg-destructive/15 text-destructive border-destructive/40'
+                    : 'bg-primary text-primary-foreground border-primary/50 hover:opacity-90'
+              }`}
             >
-              <Play size={14} fill="currentColor" />
-              <span className="hidden sm:inline">{t('task_detail.restart')}</span>
-            </button>
+              {renderActionIcon('restart', <Play size={14} fill="currentColor" />)}
+              <span>{t('task_detail.restart')}</span>
+            </motion.button>
           )}
+          <motion.button
+            onClick={() => handleExport('csv')}
+            disabled={results.length === 0}
+            whileTap={{ scale: microInteraction.actionButtonPress.scale }}
+            transition={{ duration: microInteraction.actionButtonPress.duration, ease: microInteraction.actionButtonPress.ease }}
+            className="flex items-center gap-2 px-3 py-1.5 text-sm font-semibold rounded-md border transition-all disabled:opacity-50 disabled:cursor-not-allowed bg-background/80 text-foreground border-border hover:bg-accent/70"
+          >
+            <Download size={14} />
+            <span>{t('task_detail.export_csv')}</span>
+          </motion.button>
+          <motion.button
+            onClick={() => handleExport('json')}
+            disabled={results.length === 0}
+            whileTap={{ scale: microInteraction.actionButtonPress.scale }}
+            transition={{ duration: microInteraction.actionButtonPress.duration, ease: microInteraction.actionButtonPress.ease }}
+            className="flex items-center gap-2 px-3 py-1.5 text-sm font-semibold rounded-md border transition-all disabled:opacity-50 disabled:cursor-not-allowed bg-background/80 text-foreground border-border hover:bg-accent/70"
+          >
+            <Download size={14} />
+            <span>{t('task_detail.export_json')}</span>
+          </motion.button>
         </div>
       </div>
 
-      {/* Error / Info bar */}
       {(task.exitCode !== undefined || task.errorMessage) && (
         <div className="px-4 py-2 bg-destructive/10 border-b border-destructive/20 flex items-start gap-2 text-sm">
           <AlertOctagon size={14} className="mt-0.5 text-destructive flex-shrink-0" />
@@ -196,26 +332,41 @@ export const TaskDetail: React.FC<TaskDetailProps> = ({ task }) => {
         </div>
       )}
 
-      {/* Stats summary row */}
-      <div className="flex items-center gap-6 px-4 py-2 border-b border-border bg-muted/30 text-xs text-muted-foreground flex-shrink-0">
-        <Info size={12} className="text-blue-400 flex-shrink-0" />
-        <span>{t('task_detail.stat_assets')} <strong className="text-foreground">{new Set(results.map(r => r.ip)).size}</strong></span>
-        <span>{t('task_detail.stat_ports')} <strong className="text-foreground">{results.length}</strong></span>
-        <span>{t('task_detail.stat_services')} <strong className="text-foreground">{new Set(results.map(r => r.service).filter(Boolean)).size}</strong></span>
-        <span>{t('task_detail.stat_vulns')} <strong className="text-foreground">0</strong></span>
+      <div className="border-b border-border bg-card/55 backdrop-blur-sm px-3 sm:px-4 md:px-6 py-3">
+        <div className="grid grid-cols-2 gap-2">
+          {tabs.map((tab) => {
+            const isActive = activeSection === tab.section;
+            return (
+              <Link
+                key={tab.section}
+                to={`/task/${task.id}/results/${tab.section}`}
+                className={`group rounded-lg border px-3 py-2 transition-all h-[84px] ${
+                  isActive
+                    ? `bg-gradient-to-r text-white shadow-[0_12px_26px_-18px_rgba(59,130,246,0.9)] ${tab.activeClass}`
+                    : 'border-border/70 bg-background/60 text-muted-foreground hover:text-foreground hover:border-primary/30 hover:bg-accent/50'
+                }`}
+              >
+                <div className="h-full flex flex-col items-center justify-center gap-1">
+                  <span className={`text-lg sm:text-xl font-black tabular-nums leading-none ${isActive ? 'text-white' : 'text-foreground'}`}>
+                    {tab.count}
+                  </span>
+                  <p className={`text-xs font-semibold tracking-wide uppercase truncate ${isActive ? 'text-white/90' : 'text-muted-foreground group-hover:text-foreground/80'}`}>
+                    {tab.title}
+                  </p>
+                </div>
+              </Link>
+            );
+          })}
+        </div>
       </div>
 
-      {/* Main content: charts left, table right */}
-      <div className="flex-1 overflow-hidden flex flex-col md:flex-row min-h-0">
-        {/* Left: charts */}
-        <div className="md:w-[45%] lg:w-[40%] overflow-y-auto p-4 border-b md:border-b-0 md:border-r border-border">
-          <DashboardGrid results={results} />
-        </div>
-
-        {/* Right: results table */}
-        <div className="flex-1 overflow-y-auto p-4">
-          <h3 className="text-sm font-semibold text-foreground mb-3">{t('task_detail.scan_results')}</h3>
-          <ResultsTable results={results} />
+      <div className="flex-1 min-h-0 p-3 sm:p-4 md:p-6">
+        <div className="h-full rounded-xl border border-border bg-card/60 backdrop-blur-sm overflow-hidden">
+          {activeSection === 'ports' ? (
+            <TaskPortsDetail task={task} embedded />
+          ) : (
+            <TaskResultPlaceholderDetail task={task} section={activeSection} embedded />
+          )}
         </div>
       </div>
     </div>

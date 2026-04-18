@@ -41,6 +41,20 @@ export interface ScanResult {
   service: string;
   tool: string;
   timestamp: string;
+  vulnerabilityId?: string;
+  severity?: string;
+  title?: string;
+  evidence?: string;
+  vulnStatus?: string;
+}
+
+export interface VulnerabilityRecord {
+  id?: string;
+  severity?: string;
+  title?: string;
+  target?: string;
+  evidence?: string;
+  status?: string;
 }
 
 export interface Task {
@@ -68,6 +82,7 @@ export interface Task {
   result?: string;
   workflow: Workflow;
   results: ScanResult[];
+  vulnerabilities?: VulnerabilityRecord[];
 }
 
 export interface BackendConfig {
@@ -98,6 +113,14 @@ export interface ServerInfo {
   loadAverage: number[];
   diskTotalBytes: number;
   diskFreeBytes: number;
+  tools: ToolCapability[];
+}
+
+export interface ToolCapability {
+  toolId: string;
+  available: boolean;
+  source: string;
+  path: string;
 }
 
 export type TaskAction =

@@ -70,6 +70,19 @@ impl TasksService {
             results: vec![],
         }
     }
+
+    fn map_step_to_command_id(step_type: i32, tool: &str) -> Option<String> {
+        if tool == "builtin" {
+            let mapped = match step_type {
+                1 => "builtin_port_scan",
+                2 => "httpx",
+                3 => "nuclei",
+                _ => return None,
+            };
+            return Some(mapped.to_string());
+        }
+        Some(tool.to_string())
+    }
 }
 
 impl From<crate::domain::types::Workflow> for crate::handler::tasks_proto::Workflow {
@@ -166,6 +179,18 @@ impl tasks_server::Tasks for TasksService {
         if req.workflow.is_none() {
             return Err(Status::invalid_argument("Workflow is required"));
         }
+        let workflow_proto = req.workflow.clone().ok_or_else(|| Status::invalid_argument("Workflow is required"))?;
+        if workflow_proto.steps.is_empty() {
+            return Err(Status::invalid_argument("Workflow 至少需要一个步骤"));
+        }
+        for step in &workflow_proto.steps {
+            let cmd_id = Self::map_step_to_command_id(step.r#type, &step.tool)
+                .ok_or_else(|| Status::invalid_argument(format!("无效的 workflow step: type={}, tool={}", step.r#type, step.tool)))?;
+            if self.registry.get(&cmd_id).is_none() {
+                return Err(Status::invalid_argument(format!("未注册的扫描工具: {}", cmd_id)));
+            }
+        }
+        let workflow_model: crate::domain::types::Workflow = workflow_proto.into();
 
         let id = Uuid::new_v4().to_string();
         let now = chrono::Utc::now().timestamp_millis();
@@ -184,7 +209,7 @@ impl tasks_server::Tasks for TasksService {
             finished_at: None,
             log_path: String::new(),
             progress: 0,
-            workflow: req.workflow.map(|w| w.into()).unwrap_or_default(),
+            workflow: workflow_model.clone(),
         };
 
         self.store.create_task(&meta).await.map_err(Status::from)?;
@@ -197,7 +222,11 @@ impl tasks_server::Tasks for TasksService {
             task_db::create_targets_db(&task_dir, &req.targets).await
                 .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
 
-            let workflow = vec!["ping"];
+            let workflow: Vec<String> = workflow_model
+                .steps
+                .iter()
+                .filter_map(|step| Self::map_step_to_command_id(step.r#type, &step.tool))
+                .collect();
             let commands_dir = task_dir.join("commands");
             tokio::fs::create_dir_all(&commands_dir).await?;
 

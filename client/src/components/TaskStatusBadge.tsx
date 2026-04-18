@@ -1,15 +1,17 @@
 import { TaskStatus } from '../types';
 import { AlertOctagon, CheckCircle2, Clock, PauseCircle, StopCircle } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 export const TaskStatusBadge = ({ status }: { status: TaskStatus }) => {
+  const { t } = useTranslation();
   const styles = {
     [TaskStatus.UNSPECIFIED]: 'bg-muted text-muted-foreground border-border',
     [TaskStatus.PENDING]: 'bg-muted text-muted-foreground border-border',
-    [TaskStatus.RUNNING]: 'bg-blue-900/30 text-blue-300 border-blue-800 animate-pulse',
-    [TaskStatus.DONE]: 'bg-green-900/30 text-green-300 border-green-800',
-    [TaskStatus.FAILED]: 'bg-red-900/30 text-red-300 border-red-800',
-    [TaskStatus.STOPPED]: 'bg-orange-900/30 text-orange-300 border-orange-800',
-    [TaskStatus.PAUSED]: 'bg-yellow-900/30 text-yellow-300 border-yellow-800',
+    [TaskStatus.RUNNING]: 'bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/45 animate-pulse',
+    [TaskStatus.DONE]: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/45',
+    [TaskStatus.FAILED]: 'bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/45',
+    [TaskStatus.STOPPED]: 'bg-orange-500/15 text-orange-700 dark:text-orange-300 border-orange-500/45',
+    [TaskStatus.PAUSED]: 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/45',
   };
 
   const icons = {
@@ -25,7 +27,7 @@ export const TaskStatusBadge = ({ status }: { status: TaskStatus }) => {
   return (
     <span className={`flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] uppercase font-bold border ${styles[status] || styles[TaskStatus.PENDING]}`}>
       {icons[status] || icons[TaskStatus.PENDING]}
-      {TaskStatus[status]}
+      {t(`task_status.${TaskStatus[status]?.toLowerCase() ?? 'pending'}`)}
     </span>
   );
 };

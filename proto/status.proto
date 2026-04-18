@@ -22,5 +22,13 @@ message ServerInfoResponse {
   repeated double load_average = 8;
   uint64 disk_total_bytes = 9;
   uint64 disk_free_bytes = 10;
+  repeated ToolCapability tools = 11;
 
+}
+
+message ToolCapability {
+  string tool_id = 1;
+  bool available = 2;
+  string source = 3;
+  string path = 4;
 }

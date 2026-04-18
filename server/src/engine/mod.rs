@@ -70,18 +70,18 @@ impl TaskManager for BackgroundTaskRunner {
             for step in &workflow.steps {
                 let cmd_id = if step.tool == "builtin" {
                     match step.r#type {
-                        1 => "builtin_port_scan",
-                        2 => "httpx",
-                        3 => "nuclei",
-                        _ => "unknown",
+                        1 => "builtin_port_scan".to_string(),
+                        2 => "httpx".to_string(),
+                        3 => "nuclei".to_string(),
+                        _ => return Err(AppError::Config(format!("无效的 workflow step type: {}", step.r#type))),
                     }
                 } else {
-                    &step.tool
+                    step.tool.clone()
                 };
 
                 specs.push(CommandSpec {
-                    id: cmd_id.to_string(),
-                    program: PathBuf::from(cmd_id),
+                    id: cmd_id.clone(),
+                    program: PathBuf::from(&cmd_id),
                     targets: meta.targets.clone(),
                     args: vec![],
                     env: None,

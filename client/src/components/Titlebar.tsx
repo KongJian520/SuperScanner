@@ -27,25 +27,25 @@ interface Menu {
   items: MenuItem[];
 }
 
-const WindowControls: React.FC<{ side: 'left' | 'right' }> = ({ side }) => (
+const WindowControls: React.FC<{ side: 'left' | 'right'; labels: { close: string; minimize: string; maximize: string } }> = ({ side, labels }) => (
   <div className={`flex items-center gap-1.5 z-10 ${side === 'left' ? 'mr-2' : 'ml-2'}`}>
     {isMac ? (
       <>
-        <button onClick={() => appWindow?.close()} className="w-3 h-3 rounded-full bg-[#ff5f57] hover:brightness-90 transition-all" title="Close" />
-        <button onClick={() => appWindow?.minimize()} className="w-3 h-3 rounded-full bg-[#febc2e] hover:brightness-90 transition-all" title="Minimize" />
-        <button onClick={() => appWindow?.toggleMaximize()} className="w-3 h-3 rounded-full bg-[#28c840] hover:brightness-90 transition-all" title="Maximize" />
+        <button onClick={() => appWindow?.close()} className="w-3 h-3 rounded-full bg-[#ff5f57] hover:brightness-90 transition-all hover:scale-110 shadow-[0_0_12px_rgba(255,95,87,0.45)]" title={labels.close} />
+        <button onClick={() => appWindow?.minimize()} className="w-3 h-3 rounded-full bg-[#febc2e] hover:brightness-90 transition-all hover:scale-110 shadow-[0_0_12px_rgba(254,188,46,0.45)]" title={labels.minimize} />
+        <button onClick={() => appWindow?.toggleMaximize()} className="w-3 h-3 rounded-full bg-[#28c840] hover:brightness-90 transition-all hover:scale-110 shadow-[0_0_12px_rgba(40,200,64,0.45)]" title={labels.maximize} />
       </>
     ) : isWindows ? (
       <>
-        <button onClick={() => appWindow?.minimize()} className="p-1.5 hover:bg-foreground/10 rounded transition-colors text-muted-foreground hover:text-foreground"><Minus size={13} /></button>
-        <button onClick={() => appWindow?.toggleMaximize()} className="p-1.5 hover:bg-foreground/10 rounded transition-colors text-muted-foreground hover:text-foreground"><Square size={11} /></button>
-        <button onClick={() => appWindow?.close()} className="p-1.5 hover:bg-red-500/80 rounded transition-colors text-muted-foreground hover:text-white"><X size={13} /></button>
+        <button onClick={() => appWindow?.minimize()} className="p-1.5 hover:bg-cyan-500/15 rounded-md border border-transparent hover:border-cyan-400/35 transition-[color,background-color,border-color,transform] text-muted-foreground hover:text-foreground hover:-translate-y-0.5"><Minus size={13} /></button>
+        <button onClick={() => appWindow?.toggleMaximize()} className="p-1.5 hover:bg-cyan-500/15 rounded-md border border-transparent hover:border-cyan-400/35 transition-[color,background-color,border-color,transform] text-muted-foreground hover:text-foreground hover:-translate-y-0.5"><Square size={11} /></button>
+        <button onClick={() => appWindow?.close()} className="p-1.5 hover:bg-red-500/80 rounded-md border border-transparent hover:border-red-300/50 transition-[color,background-color,border-color,transform] text-muted-foreground hover:text-white hover:-translate-y-0.5"><X size={13} /></button>
       </>
     ) : (
       <>
-        <button onClick={() => appWindow?.minimize()} className="p-1.5 hover:bg-foreground/10 rounded-full transition-colors text-muted-foreground hover:text-foreground"><Minus size={13} /></button>
-        <button onClick={() => appWindow?.toggleMaximize()} className="p-1.5 hover:bg-foreground/10 rounded-full transition-colors text-muted-foreground hover:text-foreground"><Square size={11} /></button>
-        <button onClick={() => appWindow?.close()} className="p-1.5 hover:bg-red-500/60 rounded-full transition-colors text-muted-foreground hover:text-white"><X size={13} /></button>
+        <button onClick={() => appWindow?.minimize()} className="p-1.5 hover:bg-cyan-500/15 rounded-full transition-[color,background-color,transform] text-muted-foreground hover:text-foreground hover:-translate-y-0.5"><Minus size={13} /></button>
+        <button onClick={() => appWindow?.toggleMaximize()} className="p-1.5 hover:bg-cyan-500/15 rounded-full transition-[color,background-color,transform] text-muted-foreground hover:text-foreground hover:-translate-y-0.5"><Square size={11} /></button>
+        <button onClick={() => appWindow?.close()} className="p-1.5 hover:bg-red-500/60 rounded-full transition-[color,background-color,transform] text-muted-foreground hover:text-white hover:-translate-y-0.5"><X size={13} /></button>
       </>
     )}
   </div>
@@ -57,21 +57,21 @@ const MenuBarItem: React.FC<{ menu: Menu; isOpen: boolean; onOpen: () => void; o
       <button
         onClick={() => isOpen ? onClose() : onOpen()}
         onMouseEnter={() => anyOpen && !isOpen && onOpen()}
-        className={`px-2.5 py-1 text-xs rounded transition-colors select-none
-          ${isOpen ? 'bg-foreground/15 text-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-foreground/8'}`}
+        className={`px-2.5 py-1 text-xs rounded-md border transition-[color,background-color,border-color,transform] select-none
+          ${isOpen ? 'bg-primary/15 text-foreground border-primary/30 shadow-[0_8px_20px_rgba(59,130,246,0.18)]' : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-foreground/8 hover:border-primary/20 hover:-translate-y-0.5'}`}
       >
         {menu.label}
       </button>
       {isOpen && (
-        <div className="absolute top-full left-0 mt-0.5 bg-popover border border-border rounded-md shadow-xl py-1 min-w-[180px] z-[100]">
+        <div className="absolute top-full left-0 mt-1 bg-popover/95 border border-primary/25 rounded-lg shadow-2xl shadow-primary/15 py-1 min-w-[200px] z-[100] backdrop-blur-md">
           {menu.items.map((item, i) =>
             item.label === '---' ? (
-              <div key={i} className="my-1 border-t border-border" />
+              <div key={i} className="my-1 border-t border-border/80" />
             ) : (
               <button
                 key={item.label}
                 onClick={() => { item.action?.(); onClose(); }}
-                className="w-full px-3 py-1.5 text-xs text-left flex items-center justify-between text-foreground hover:bg-accent transition-colors"
+                className="w-full px-3 py-1.5 text-xs text-left flex items-center justify-between text-foreground hover:bg-accent/80 transition-[background-color,color]"
               >
                 <span>{item.label}</span>
                 {item.shortcut && <span className="text-muted-foreground ml-6">{item.shortcut}</span>}
@@ -131,22 +131,30 @@ export const Titlebar: React.FC = () => {
   return (
     <div
       data-tauri-drag-region
-      className="hidden md:flex h-9 bg-card items-center select-none border-b border-border z-50 shrink-0 relative"
+      className="hidden md:flex h-9 bg-card/95 items-center select-none border-b border-border/80 z-50 shrink-0 relative backdrop-blur-md overflow-hidden"
     >
+      <span className="pointer-events-none absolute inset-x-0 top-0 h-10 bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.2),transparent_72%)]" />
       {/* macOS: 窗口控制在左（仅 Tauri 环境，需 decorations:false） */}
       {isTauri && isMac && (
-        <div className="flex items-center pl-3 pr-1">
-          <WindowControls side="left" />
+        <div className="flex items-center pl-3 pr-1 relative z-10">
+          <WindowControls
+            side="left"
+            labels={{
+              close: t('titlebar.window_controls.close'),
+              minimize: t('titlebar.window_controls.minimize'),
+              maximize: t('titlebar.window_controls.maximize'),
+            }}
+          />
         </div>
       )}
 
       {/* 应用图标 + 名称 */}
-      <div className="flex items-center gap-1.5 px-3 shrink-0" data-tauri-drag-region>
-        <span className="text-xs font-semibold text-foreground/70 tracking-wide">PolyScan Pro</span>
+      <div className="flex items-center gap-1.5 px-3 shrink-0 relative z-10" data-tauri-drag-region>
+        <span className="text-xs font-semibold text-foreground/75 tracking-[0.12em] uppercase">{t('app.name')}</span>
       </div>
 
       {/* 菜单栏 */}
-      <div ref={menuBarRef} className="flex items-center gap-0.5">
+      <div ref={menuBarRef} className="flex items-center gap-0.5 relative z-10">
         {menus.map((menu) => (
           <MenuBarItem
             key={menu.label}
@@ -160,12 +168,19 @@ export const Titlebar: React.FC = () => {
       </div>
 
       {/* 拖拽区域填充 */}
-      <div className="flex-1" data-tauri-drag-region />
+      <div className="flex-1 relative z-10" data-tauri-drag-region />
 
       {/* Windows / Linux: 窗口控制在右（仅 Tauri 环境） */}
       {isTauri && !isMac && (
-        <div className="flex items-center pr-1">
-          <WindowControls side="right" />
+        <div className="flex items-center pr-1 relative z-10">
+          <WindowControls
+            side="right"
+            labels={{
+              close: t('titlebar.window_controls.close'),
+              minimize: t('titlebar.window_controls.minimize'),
+              maximize: t('titlebar.window_controls.maximize'),
+            }}
+          />
         </div>
       )}
     </div>

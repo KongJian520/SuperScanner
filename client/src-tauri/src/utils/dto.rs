@@ -21,6 +21,16 @@ pub struct ServerInfoDto {
     pub load_average: Vec<f64>,
     pub disk_total_bytes: Option<u64>,
     pub disk_free_bytes: Option<u64>,
+    pub tools: Vec<ToolCapabilityDto>,
+}
+
+#[derive(Serialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ToolCapabilityDto {
+    pub tool_id: String,
+    pub available: bool,
+    pub source: String,
+    pub path: String,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]

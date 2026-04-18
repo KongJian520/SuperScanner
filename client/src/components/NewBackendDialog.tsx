@@ -70,15 +70,15 @@ const NewBackendDialog: React.FC<{ open: boolean; onCancel: () => void }> = ({ o
 
     return (
         <Dialog open={open} onOpenChange={(v) => !v && onCancel()}>
-            <DialogContent className="sm:max-w-[425px]">
-                <DialogHeader>
+            <DialogContent className="sm:max-w-[425px] border-border/60 bg-background/95 supports-[backdrop-filter]:bg-background/85 backdrop-blur-sm data-[state=open]:duration-300 data-[state=closed]:duration-200 data-[state=open]:slide-in-from-top-2 data-[state=closed]:slide-out-to-top-2">
+                <DialogHeader className="motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-bottom-2 motion-safe:duration-300 motion-safe:[animation-delay:40ms] motion-safe:[animation-fill-mode:both]">
                     <DialogTitle>{t('new_backend.title')}</DialogTitle>
                     <DialogDescription>
                         {t('new_backend.description')}
                     </DialogDescription>
                 </DialogHeader>
                 
-                <form onSubmit={handleSubmit} className="grid gap-4 py-4">
+                <form onSubmit={handleSubmit} className="grid gap-4 py-4 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-bottom-2 motion-safe:duration-300 motion-safe:[animation-delay:110ms] motion-safe:[animation-fill-mode:both]">
                     <div className="grid gap-2">
                         <Label htmlFor="name" className={nameError ? "text-destructive" : ""}>{t('new_backend.name_label')}</Label>
                         <Input
@@ -91,7 +91,12 @@ const NewBackendDialog: React.FC<{ open: boolean; onCancel: () => void }> = ({ o
                             className={nameError ? "border-destructive focus-visible:ring-destructive" : ""}
                             disabled={isSubmitting}
                         />
-                        {nameError && <span className="text-xs text-destructive">{nameError}</span>}
+                        <div
+                            className={`grid transition-all duration-200 ease-out ${nameError ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}
+                            aria-live="polite"
+                        >
+                            <span className="overflow-hidden text-xs text-destructive">{nameError || "\u00A0"}</span>
+                        </div>
                     </div>
 
                     <div className="grid gap-2">
@@ -127,7 +132,12 @@ const NewBackendDialog: React.FC<{ open: boolean; onCancel: () => void }> = ({ o
                             disabled={isSubmitting}
                             className={addressError ? "border-destructive focus-visible:ring-destructive" : ""}
                         />
-                        {addressError && <span className="text-xs text-destructive">{addressError}</span>}
+                        <div
+                            className={`grid transition-all duration-200 ease-out ${addressError ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}
+                            aria-live="polite"
+                        >
+                            <span className="overflow-hidden text-xs text-destructive">{addressError || "\u00A0"}</span>
+                        </div>
                     </div>
 
                     <div className="grid gap-2">
@@ -161,14 +171,19 @@ const NewBackendDialog: React.FC<{ open: boolean; onCancel: () => void }> = ({ o
                         </div>
                     </div>
 
-                    {submitError && (
-                        <div className="text-sm text-destructive bg-destructive/10 p-3 rounded-md">
-                            {submitError.message}
+                    <div
+                        className={`grid transition-all duration-200 ease-out ${submitError ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}
+                        aria-live="polite"
+                    >
+                        <div className="overflow-hidden">
+                            <div className="text-sm text-destructive bg-destructive/10 p-3 rounded-md motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-top-1 motion-safe:duration-200">
+                                {submitError?.message}
+                            </div>
                         </div>
-                    )}
+                    </div>
                 </form>
 
-                <DialogFooter>
+                <DialogFooter className="motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-bottom-2 motion-safe:duration-300 motion-safe:[animation-delay:180ms] motion-safe:[animation-fill-mode:both]">
                     <Button variant="outline" onClick={onCancel} disabled={isSubmitting}>
                         {t('new_backend.cancel')}
                     </Button>
