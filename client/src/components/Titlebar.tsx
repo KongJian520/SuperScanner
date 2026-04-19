@@ -129,60 +129,73 @@ export const Titlebar: React.FC = () => {
   ];
 
   return (
-    <div
-      data-tauri-drag-region
-      className="hidden md:flex h-9 bg-card/95 items-center select-none border-b border-border/80 z-50 shrink-0 relative backdrop-blur-md overflow-hidden"
-    >
-      <span className="pointer-events-none absolute inset-x-0 top-0 h-10 bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.2),transparent_72%)]" />
-      {/* macOS: 窗口控制在左（仅 Tauri 环境，需 decorations:false） */}
-      {isTauri && isMac && (
-        <div className="flex items-center pl-3 pr-1 relative z-10">
-          <WindowControls
-            side="left"
-            labels={{
-              close: t('titlebar.window_controls.close'),
-              minimize: t('titlebar.window_controls.minimize'),
-              maximize: t('titlebar.window_controls.maximize'),
-            }}
-          />
+    <>
+      <div className="md:hidden shrink-0 border-b border-border/70 bg-card/90 backdrop-blur-md">
+        <div
+          className="w-full"
+          style={{ paddingTop: 'env(safe-area-inset-top)' }}
+        >
+          <div className="h-10 px-3 flex items-center">
+            <span className="text-[11px] font-semibold text-foreground/80 tracking-[0.12em] uppercase">{t('app.name')}</span>
+          </div>
         </div>
-      )}
-
-      {/* 应用图标 + 名称 */}
-      <div className="flex items-center gap-1.5 px-3 shrink-0 relative z-10" data-tauri-drag-region>
-        <span className="text-xs font-semibold text-foreground/75 tracking-[0.12em] uppercase">{t('app.name')}</span>
       </div>
 
-      {/* 菜单栏 */}
-      <div ref={menuBarRef} className="flex items-center gap-0.5 relative z-10">
-        {menus.map((menu) => (
-          <MenuBarItem
-            key={menu.label}
-            menu={menu}
-            isOpen={activeMenu === menu.label}
-            onOpen={() => setActiveMenu(menu.label)}
-            onClose={() => setActiveMenu(null)}
-            anyOpen={activeMenu !== null}
-          />
-        ))}
-      </div>
+      <div
+        data-tauri-drag-region
+        className="hidden md:flex h-9 bg-card/95 items-center select-none border-b border-border/80 z-50 shrink-0 relative backdrop-blur-md overflow-hidden"
+      >
+        <span className="pointer-events-none absolute inset-x-0 top-0 h-10 bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.2),transparent_72%)]" />
+        {/* macOS: 窗口控制在左（仅 Tauri 环境，需 decorations:false） */}
+        {isTauri && isMac && (
+          <div className="flex items-center pl-3 pr-1 relative z-10">
+            <WindowControls
+              side="left"
+              labels={{
+                close: t('titlebar.window_controls.close'),
+                minimize: t('titlebar.window_controls.minimize'),
+                maximize: t('titlebar.window_controls.maximize'),
+              }}
+            />
+          </div>
+        )}
 
-      {/* 拖拽区域填充 */}
-      <div className="flex-1 relative z-10" data-tauri-drag-region />
-
-      {/* Windows / Linux: 窗口控制在右（仅 Tauri 环境） */}
-      {isTauri && !isMac && (
-        <div className="flex items-center pr-1 relative z-10">
-          <WindowControls
-            side="right"
-            labels={{
-              close: t('titlebar.window_controls.close'),
-              minimize: t('titlebar.window_controls.minimize'),
-              maximize: t('titlebar.window_controls.maximize'),
-            }}
-          />
+        {/* 应用图标 + 名称 */}
+        <div className="flex items-center gap-1.5 px-3 shrink-0 relative z-10" data-tauri-drag-region>
+          <span className="text-xs font-semibold text-foreground/75 tracking-[0.12em] uppercase">{t('app.name')}</span>
         </div>
-      )}
-    </div>
+
+        {/* 菜单栏 */}
+        <div ref={menuBarRef} className="flex items-center gap-0.5 relative z-10">
+          {menus.map((menu) => (
+            <MenuBarItem
+              key={menu.label}
+              menu={menu}
+              isOpen={activeMenu === menu.label}
+              onOpen={() => setActiveMenu(menu.label)}
+              onClose={() => setActiveMenu(null)}
+              anyOpen={activeMenu !== null}
+            />
+          ))}
+        </div>
+
+        {/* 拖拽区域填充 */}
+        <div className="flex-1 relative z-10" data-tauri-drag-region />
+
+        {/* Windows / Linux: 窗口控制在右（仅 Tauri 环境） */}
+        {isTauri && !isMac && (
+          <div className="flex items-center pr-1 relative z-10">
+            <WindowControls
+              side="right"
+              labels={{
+                close: t('titlebar.window_controls.close'),
+                minimize: t('titlebar.window_controls.minimize'),
+                maximize: t('titlebar.window_controls.maximize'),
+              }}
+            />
+          </div>
+        )}
+      </div>
+    </>
   );
 };

@@ -128,6 +128,7 @@ function applyTaskUpdate(t: Task, payload: any): Task {
 // Global map to avoid attaching multiple Tauri listeners for the same task
 type ActiveListener = { count: number; unlisten?: () => void; removed?: boolean };
 const activeTaskListeners: Map<string, ActiveListener> = new Map();
+const bootstrappedTaskStreams: Set<string> = new Set();
 
 export function useTaskEvents(backendId: string | null, taskId: string | null) {
   const { data: backends } = useBackends();
@@ -136,6 +137,7 @@ export function useTaskEvents(backendId: string | null, taskId: string | null) {
 
   useEffect(() => {
     if (!backend?.address || !taskId) return;
+    const streamKey = `${backendId ?? 'default'}:${taskId}`;
 
     let localRemoved = false;
 
@@ -149,12 +151,15 @@ export function useTaskEvents(backendId: string | null, taskId: string | null) {
       // Reserve entry immediately to avoid races from concurrent mounts
       activeTaskListeners.set(taskId, { count: 1, unlisten: undefined, removed: false });
 
-      try {
-        await api.streamTaskEvents(backend.address!, taskId, !!backend.useTls);
-      } catch {
-        const cur = activeTaskListeners.get(taskId);
-        if (cur && cur.count <= 1) activeTaskListeners.delete(taskId);
-        return;
+      if (!bootstrappedTaskStreams.has(streamKey)) {
+        try {
+          await api.streamTaskEvents(backend.address!, taskId, !!backend.useTls);
+          bootstrappedTaskStreams.add(streamKey);
+        } catch {
+          const cur = activeTaskListeners.get(taskId);
+          if (cur && cur.count <= 1) activeTaskListeners.delete(taskId);
+          return;
+        }
       }
 
       const unlisten = await listen(`task-event://${taskId}`, (event: any) => {

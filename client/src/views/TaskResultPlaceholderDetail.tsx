@@ -1,8 +1,20 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
+import {
+  ArrowLeft,
+  ChevronDown,
+  ChevronUp,
+  Database,
+  Folder,
+  Globe,
+  Layers,
+  Network,
+  Shield,
+  Terminal,
+} from 'lucide-react';
 import { ScanType, Task, VulnerabilityRecord } from '../types';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
 
 interface TaskResultPlaceholderDetailProps {
   task: Task;
@@ -12,30 +24,119 @@ interface TaskResultPlaceholderDetailProps {
 
 const PAGE_SIZE = 10;
 
+interface HostProfile {
+  ip: string;
+  openPorts: number[];
+  services: string[];
+  protocols: string[];
+  tools: string[];
+  roles: string[];
+  components: string[];
+  lastSeen: string;
+}
+
+const roleByService: Record<string, string> = {
+  http: 'Web',
+  https: 'Web',
+  nginx: 'Web',
+  apache: 'Web',
+  iis: 'Web',
+  mysql: 'Database',
+  mssql: 'Database',
+  postgresql: 'Database',
+  redis: 'Cache',
+  mongodb: 'Database',
+  ssh: 'Remote Access',
+  rdp: 'Remote Access',
+  smb: 'File Service',
+  ftp: 'File Service',
+  dns: 'Infrastructure',
+  ntp: 'Infrastructure',
+  snmp: 'Infrastructure',
+};
+
+const componentByService: Record<string, string> = {
+  http: 'HTTP Stack',
+  https: 'TLS Endpoint',
+  nginx: 'Nginx',
+  apache: 'Apache',
+  iis: 'IIS',
+  mysql: 'MySQL',
+  postgresql: 'PostgreSQL',
+  mssql: 'SQL Server',
+  redis: 'Redis',
+  mongodb: 'MongoDB',
+  ssh: 'SSH Daemon',
+  rdp: 'RDP Service',
+  smb: 'SMB Service',
+  ftp: 'FTP Service',
+  dns: 'DNS Service',
+};
+
+const dedupeSort = (items: string[]) => Array.from(new Set(items.filter(Boolean))).sort((a, b) => a.localeCompare(b));
+
+const toServiceKey = (service: string) => service.trim().toLowerCase().replace(/[^a-z0-9]+/g, '');
+
+const hostIconByRole: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
+  web: Globe,
+  database: Database,
+  cache: Layers,
+  infrastructure: Network,
+  'remote access': Terminal,
+  'file service': Folder,
+};
+
+const pickHostIcon = (roles: string[]) => {
+  const key = roles[0]?.trim().toLowerCase();
+  return hostIconByRole[key] ?? Shield;
+};
+
+const buildHostProfiles = (task: Task): HostProfile[] => {
+  const byIp = new Map<string, typeof task.results>();
+  for (const row of task.results || []) {
+    if (!row.ip) continue;
+    const rows = byIp.get(row.ip) ?? [];
+    rows.push(row);
+    byIp.set(row.ip, rows);
+  }
+
+  return Array.from(byIp.entries())
+    .map(([ip, rows]) => {
+      const openRows = rows.filter((r) => r.state?.toLowerCase() === 'open');
+      const rowsForProfile = openRows.length > 0 ? openRows : rows;
+      const services = dedupeSort(rowsForProfile.map((r) => (r.service || 'unknown').trim()));
+      const serviceKeys = services.map(toServiceKey);
+      const roles = dedupeSort(serviceKeys.map((k) => roleByService[k]).filter(Boolean));
+      const components = dedupeSort(serviceKeys.map((k) => componentByService[k]).filter(Boolean));
+      const timestamps = rowsForProfile.map((r) => r.timestamp).filter(Boolean).sort();
+      return {
+        ip,
+        openPorts: Array.from(new Set(rowsForProfile.map((r) => r.port).filter((p) => Number.isFinite(p)))).sort((a, b) => a - b),
+        services,
+        protocols: dedupeSort(rowsForProfile.map((r) => r.protocol)),
+        tools: dedupeSort(rowsForProfile.map((r) => r.tool)),
+        roles: roles.length > 0 ? roles : ['General Host'],
+        components,
+        lastSeen: timestamps[timestamps.length - 1] || '',
+      };
+    })
+    .sort((a, b) => a.ip.localeCompare(b.ip));
+};
+
 export const TaskResultPlaceholderDetail: React.FC<TaskResultPlaceholderDetailProps> = ({ task, section, embedded = false }) => {
   const { t } = useTranslation();
   const results = task.results || [];
-  const uniqueIps = Array.from(new Set(results.map(r => r.ip).filter(Boolean))).sort();
-  const openResults = results.filter(r => r.state?.toLowerCase() === 'open');
-  const aliveIps = Array.from(new Set(openResults.map(r => r.ip).filter(Boolean))).sort();
+  const openResults = results.filter((r) => r.state?.toLowerCase() === 'open');
+  const aliveIps = Array.from(new Set(openResults.map((r) => r.ip).filter(Boolean))).sort();
+  const hostProfiles = buildHostProfiles(task);
   const hasPocStep = task.workflow?.steps?.some((step) => step.type === ScanType.Poc) ?? false;
+  const [expandedHosts, setExpandedHosts] = React.useState<Record<string, boolean>>({});
+  const [assetsViewMode, setAssetsViewMode] = React.useState<'cards' | 'details'>('cards');
+  const [selectedHost, setSelectedHost] = React.useState<HostProfile | null>(null);
   const [pages, setPages] = React.useState<Record<'assets' | 'alive' | 'vulns', number>>({
     assets: 1,
     alive: 1,
     vulns: 1,
-  });
-
-  const assetRows = uniqueIps.map((ip) => {
-    const ipResults = results.filter((r) => r.ip === ip);
-    const openPorts = ipResults.filter((r) => r.state?.toLowerCase() === 'open').length;
-    const services = new Set(ipResults.map((r) => r.service).filter(Boolean)).size;
-    return { ip, openPorts, services };
-  });
-
-  const aliveRows = aliveIps.map((ip) => {
-    const openPorts = openResults.filter((r) => r.ip === ip).length;
-    const services = new Set(openResults.filter((r) => r.ip === ip).map((r) => r.service).filter(Boolean)).size;
-    return { ip, openPorts, services };
   });
 
   const parsedVulnsFromResults = results.flatMap((row): VulnerabilityRecord[] => {
@@ -83,7 +184,7 @@ export const TaskResultPlaceholderDetail: React.FC<TaskResultPlaceholderDetailPr
   } as const;
 
   const descMap = {
-    assets: t('task_detail.entry_assets_desc'),
+    assets: '',
     alive: t('task_detail.entry_alive_desc'),
     vulns: t('task_detail.entry_vulns_desc'),
   } as const;
@@ -117,30 +218,137 @@ export const TaskResultPlaceholderDetail: React.FC<TaskResultPlaceholderDetailPr
   const sectionBody = (
     <>
       {section === 'assets' && (
-        assetRows.length > 0 ? (() => {
-          const { rows, page, totalPages } = paginate(assetRows, pages.assets);
-          return tableFrame(
+        hostProfiles.length > 0 ? (() => {
+          const { rows, page, totalPages } = paginate(hostProfiles, pages.assets);
+          return (
             <>
-                <table className="w-full text-sm min-w-[360px] sm:min-w-[420px]">
-                <thead>
-                  <tr className="border-b border-border">
-                    <th className="text-left py-2 pr-3 text-xs uppercase text-muted-foreground">{t('task_detail.table_headers.ip')}</th>
-                    <th className="text-left py-2 pr-3 text-xs uppercase text-muted-foreground">{t('task_detail.label_open_ports')}</th>
-                    <th className="text-left py-2 text-xs uppercase text-muted-foreground">{t('task_detail.label_services')}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((row) => (
-                    <tr key={row.ip} className="border-b border-border/50">
-                      <td className="py-2 pr-3 font-mono text-xs">{row.ip}</td>
-                      <td className="py-2 pr-3 text-xs">{row.openPorts}</td>
-                      <td className="py-2 text-xs">{row.services}</td>
-                    </tr>
+              <div className="mb-2 flex items-center gap-2">
+                <button
+                  type="button"
+                  className={`px-2.5 py-1 rounded-md text-xs border ${assetsViewMode === 'cards' ? 'bg-primary/15 border-primary/40 text-primary' : 'bg-background/70 border-border text-muted-foreground'}`}
+                  onClick={() => setAssetsViewMode('cards')}
+                >
+                  {t('task_detail.assets_view_cards')}
+                </button>
+                <button
+                  type="button"
+                  className={`px-2.5 py-1 rounded-md text-xs border ${assetsViewMode === 'details' ? 'bg-primary/15 border-primary/40 text-primary' : 'bg-background/70 border-border text-muted-foreground'}`}
+                  onClick={() => setAssetsViewMode('details')}
+                >
+                  {t('task_detail.assets_view_details')}
+                </button>
+              </div>
+
+              {assetsViewMode === 'cards' ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+                  {rows.map((host) => {
+                    const HostIcon = pickHostIcon(host.roles);
+                    return (
+                      <button
+                        key={host.ip}
+                        type="button"
+                        className="rounded-lg border border-border/70 bg-card/70 p-3 text-left hover:bg-accent/50 transition-colors"
+                        onClick={() => setSelectedHost(host)}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="inline-flex items-center justify-center rounded-md border border-primary/30 bg-primary/10 p-1.5 text-primary">
+                            <HostIcon size={16} />
+                          </span>
+                          <p className="font-mono text-sm font-semibold text-foreground truncate">{host.ip}</p>
+                        </div>
+                        <p className="mt-2 text-xs text-muted-foreground truncate">{host.roles.join(', ')}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {t('task_detail.host_profile_open_ports')}: {host.openPorts.length} · {t('task_detail.label_services')}: {host.services.length}
+                        </p>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+                  {rows.map((host) => (
+                    <div key={host.ip} className="rounded-lg border border-border/70 bg-card/70 p-3 sm:p-4 space-y-3">
+                      {(() => {
+                        const expanded = !!expandedHosts[host.ip];
+                        const HostIcon = pickHostIcon(host.roles);
+                        return (
+                          <>
+                            <button
+                              type="button"
+                              className="w-full flex items-center justify-between gap-3 text-left rounded-md border border-border/60 bg-background/40 px-3 py-2 hover:bg-accent/50 transition-colors"
+                              onClick={() => setExpandedHosts((prev) => ({ ...prev, [host.ip]: !expanded }))}
+                            >
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className="inline-flex items-center justify-center rounded-md border border-primary/30 bg-primary/10 p-1.5 text-primary">
+                                  <HostIcon size={16} />
+                                </span>
+                                <div className="min-w-0">
+                                  <p className="font-mono text-sm font-semibold text-foreground truncate">{host.ip}</p>
+                                  <p className="text-xs text-muted-foreground truncate">
+                                    {host.roles.join(', ')} · {host.services.slice(0, 2).join(', ') || t('common.na')}
+                                  </p>
+                                </div>
+                              </div>
+                              <span className="text-muted-foreground">{expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}</span>
+                            </button>
+
+                            {expanded && (
+                              <>
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="text-xs text-muted-foreground">{t('task_detail.host_profile_last_seen')}: {host.lastSeen || t('common.na')}</span>
+                                </div>
+
+                                <div className="space-y-1.5">
+                                  <p className="text-xs uppercase text-muted-foreground">{t('task_detail.host_profile_roles')}</p>
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {host.roles.map((role) => (
+                                      <span key={role} className="rounded-full border border-blue-500/30 bg-blue-500/10 px-2 py-0.5 text-xs text-blue-200">
+                                        {role}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+
+                                <div className="space-y-1.5">
+                                  <p className="text-xs uppercase text-muted-foreground">{t('task_detail.host_profile_components')}</p>
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {(host.components.length > 0 ? host.components : host.services).slice(0, 10).map((component) => (
+                                      <span key={component} className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-xs text-emerald-200">
+                                        {component}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                                  <div className="rounded-md border border-border/60 bg-background/40 p-2">
+                                    <p className="text-muted-foreground">{t('task_detail.host_profile_open_ports')}</p>
+                                    <p className="mt-1 font-mono text-foreground break-all">{host.openPorts.slice(0, 12).join(', ') || t('common.na')}</p>
+                                  </div>
+                                  <div className="rounded-md border border-border/60 bg-background/40 p-2">
+                                    <p className="text-muted-foreground">{t('task_detail.host_profile_protocols')}</p>
+                                    <p className="mt-1 text-foreground">{host.protocols.join(', ') || t('common.na')}</p>
+                                  </div>
+                                  <div className="rounded-md border border-border/60 bg-background/40 p-2">
+                                    <p className="text-muted-foreground">{t('task_detail.host_profile_services')}</p>
+                                    <p className="mt-1 text-foreground break-all">{host.services.slice(0, 8).join(', ') || t('common.na')}</p>
+                                  </div>
+                                  <div className="rounded-md border border-border/60 bg-background/40 p-2">
+                                    <p className="text-muted-foreground">{t('task_detail.host_profile_tools')}</p>
+                                    <p className="mt-1 text-foreground">{host.tools.join(', ') || t('common.na')}</p>
+                                  </div>
+                                </div>
+                              </>
+                            )}
+                          </>
+                        );
+                      })()}
+                    </div>
                   ))}
-                </tbody>
-              </table>
+                </div>
+              )}
               {pager('assets', page, totalPages)}
-            </>,
+            </>
           );
         })() : (
           <div className="text-sm text-muted-foreground">{t('task_detail.no_results')}</div>
@@ -148,28 +356,18 @@ export const TaskResultPlaceholderDetail: React.FC<TaskResultPlaceholderDetailPr
       )}
 
       {section === 'alive' && (
-        aliveRows.length > 0 ? (() => {
-          const { rows, page, totalPages } = paginate(aliveRows, pages.alive);
+        aliveIps.length > 0 ? (() => {
+          const { rows, page, totalPages } = paginate(aliveIps, pages.alive);
           return tableFrame(
             <>
-                <table className="w-full text-sm min-w-[360px] sm:min-w-[420px]">
-                <thead>
-                  <tr className="border-b border-border">
-                    <th className="text-left py-2 pr-3 text-xs uppercase text-muted-foreground">{t('task_detail.table_headers.ip')}</th>
-                    <th className="text-left py-2 pr-3 text-xs uppercase text-muted-foreground">{t('task_detail.label_open_ports')}</th>
-                    <th className="text-left py-2 text-xs uppercase text-muted-foreground">{t('task_detail.label_services')}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((row) => (
-                    <tr key={row.ip} className="border-b border-border/50">
-                      <td className="py-2 pr-3 font-mono text-xs">{row.ip}</td>
-                      <td className="py-2 pr-3 text-xs">{row.openPorts}</td>
-                      <td className="py-2 text-xs">{row.services}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <p className="mb-2 text-xs text-muted-foreground">{t('task_detail.alive_ip_only_hint')}</p>
+              <div className="space-y-1">
+                {rows.map((ip) => (
+                  <div key={ip} className="rounded-md border border-border/60 bg-background/50 px-3 py-2 font-mono text-sm text-foreground">
+                    {ip}
+                  </div>
+                ))}
+              </div>
               {pager('alive', page, totalPages)}
             </>,
           );
@@ -222,11 +420,65 @@ export const TaskResultPlaceholderDetail: React.FC<TaskResultPlaceholderDetailPr
   if (embedded) {
     return (
       <div className="h-full min-h-0 flex flex-col">
-        <div className="px-3 sm:px-4 py-3 border-b border-border bg-card/45">
-          <p className="text-xs uppercase tracking-wide text-muted-foreground">{titleMap[section]}</p>
-          <p className="mt-1 text-sm text-muted-foreground">{descMap[section]}</p>
-        </div>
+        {section !== 'assets' ? (
+          <div className="px-3 sm:px-4 py-3 border-b border-border bg-card/45">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">{titleMap[section]}</p>
+            {descMap[section] ? <p className="mt-1 text-sm text-muted-foreground">{descMap[section]}</p> : null}
+          </div>
+        ) : null}
         <div className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-4">{sectionBody}</div>
+        <Dialog open={!!selectedHost} onOpenChange={(open) => !open && setSelectedHost(null)}>
+          <DialogContent className="sm:max-w-[760px]">
+            <DialogHeader>
+              <DialogTitle className="font-mono">{selectedHost?.ip}</DialogTitle>
+            </DialogHeader>
+            {selectedHost && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs text-muted-foreground">{t('task_detail.host_profile_last_seen')}: {selectedHost.lastSeen || t('common.na')}</span>
+                </div>
+                <div className="space-y-1.5">
+                  <p className="text-xs uppercase text-muted-foreground">{t('task_detail.host_profile_roles')}</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {selectedHost.roles.map((role) => (
+                      <span key={role} className="rounded-full border border-blue-500/30 bg-blue-500/10 px-2 py-0.5 text-xs text-blue-200">
+                        {role}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <p className="text-xs uppercase text-muted-foreground">{t('task_detail.host_profile_components')}</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {(selectedHost.components.length > 0 ? selectedHost.components : selectedHost.services).slice(0, 12).map((component) => (
+                      <span key={component} className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-xs text-emerald-200">
+                        {component}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                  <div className="rounded-md border border-border/60 bg-background/40 p-2">
+                    <p className="text-muted-foreground">{t('task_detail.host_profile_open_ports')}</p>
+                    <p className="mt-1 font-mono text-foreground break-all">{selectedHost.openPorts.slice(0, 16).join(', ') || t('common.na')}</p>
+                  </div>
+                  <div className="rounded-md border border-border/60 bg-background/40 p-2">
+                    <p className="text-muted-foreground">{t('task_detail.host_profile_protocols')}</p>
+                    <p className="mt-1 text-foreground">{selectedHost.protocols.join(', ') || t('common.na')}</p>
+                  </div>
+                  <div className="rounded-md border border-border/60 bg-background/40 p-2">
+                    <p className="text-muted-foreground">{t('task_detail.host_profile_services')}</p>
+                    <p className="mt-1 text-foreground break-all">{selectedHost.services.slice(0, 12).join(', ') || t('common.na')}</p>
+                  </div>
+                  <div className="rounded-md border border-border/60 bg-background/40 p-2">
+                    <p className="text-muted-foreground">{t('task_detail.host_profile_tools')}</p>
+                    <p className="mt-1 text-foreground">{selectedHost.tools.join(', ') || t('common.na')}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     );
   }
@@ -238,7 +490,7 @@ export const TaskResultPlaceholderDetail: React.FC<TaskResultPlaceholderDetailPr
           <div className="min-w-0">
             <p className="text-xs uppercase tracking-wide text-muted-foreground">{t('task_detail.task_name_label', { name: task.name })}</p>
             <h2 className="text-xl md:text-2xl font-bold text-foreground truncate">{titleMap[section]}</h2>
-            <p className="mt-1 text-sm text-muted-foreground">{descMap[section]}</p>
+            {descMap[section] ? <p className="mt-1 text-sm text-muted-foreground">{descMap[section]}</p> : null}
           </div>
           <Link
             to={`/task/${task.id}`}
@@ -251,6 +503,58 @@ export const TaskResultPlaceholderDetail: React.FC<TaskResultPlaceholderDetailPr
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-4">{sectionBody}</div>
+      <Dialog open={!!selectedHost} onOpenChange={(open) => !open && setSelectedHost(null)}>
+        <DialogContent className="sm:max-w-[760px]">
+          <DialogHeader>
+            <DialogTitle className="font-mono">{selectedHost?.ip}</DialogTitle>
+          </DialogHeader>
+          {selectedHost && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs text-muted-foreground">{t('task_detail.host_profile_last_seen')}: {selectedHost.lastSeen || t('common.na')}</span>
+              </div>
+              <div className="space-y-1.5">
+                <p className="text-xs uppercase text-muted-foreground">{t('task_detail.host_profile_roles')}</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {selectedHost.roles.map((role) => (
+                    <span key={role} className="rounded-full border border-blue-500/30 bg-blue-500/10 px-2 py-0.5 text-xs text-blue-200">
+                      {role}
+                    </span>
+                  ))}
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <p className="text-xs uppercase text-muted-foreground">{t('task_detail.host_profile_components')}</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {(selectedHost.components.length > 0 ? selectedHost.components : selectedHost.services).slice(0, 12).map((component) => (
+                    <span key={component} className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-xs text-emerald-200">
+                      {component}
+                    </span>
+                  ))}
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                <div className="rounded-md border border-border/60 bg-background/40 p-2">
+                  <p className="text-muted-foreground">{t('task_detail.host_profile_open_ports')}</p>
+                  <p className="mt-1 font-mono text-foreground break-all">{selectedHost.openPorts.slice(0, 16).join(', ') || t('common.na')}</p>
+                </div>
+                <div className="rounded-md border border-border/60 bg-background/40 p-2">
+                  <p className="text-muted-foreground">{t('task_detail.host_profile_protocols')}</p>
+                  <p className="mt-1 text-foreground">{selectedHost.protocols.join(', ') || t('common.na')}</p>
+                </div>
+                <div className="rounded-md border border-border/60 bg-background/40 p-2">
+                  <p className="text-muted-foreground">{t('task_detail.host_profile_services')}</p>
+                  <p className="mt-1 text-foreground break-all">{selectedHost.services.slice(0, 12).join(', ') || t('common.na')}</p>
+                </div>
+                <div className="rounded-md border border-border/60 bg-background/40 p-2">
+                  <p className="text-muted-foreground">{t('task_detail.host_profile_tools')}</p>
+                  <p className="mt-1 text-foreground">{selectedHost.tools.join(', ') || t('common.na')}</p>
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

@@ -27,11 +27,11 @@ pub fn init(path: PathBuf, log_name: &str) -> WorkerGuard {
 
     let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
 
-    tracing_subscriber::registry()
+    let _ = tracing_subscriber::registry()
         .with(env_filter)
         .with(console_layer)
         .with(file_layer)
-        .init();
+        .try_init();
 
     guard
 }
