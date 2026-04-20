@@ -99,6 +99,8 @@
     "name_placeholder": "Production Server",
     "name_required": "Name is required",
     "connection_details": "Connection Details",
+    "mode_host_port": "Host + Port",
+    "mode_full_url": "Full URL",
     "ip_placeholder": "IP / Hostname",
     "port_placeholder": "Port",
     "or_full_url": "Or full URL",
@@ -183,9 +185,12 @@
     "ports_service_donut_title": "Service Donut",
     "ports_service_donut_desc": "Tap a segment to filter the table by service.",
     "ports_service_total": "Service Hits",
-    "ports_port_donut_title": "Port Donut",
-    "ports_port_donut_desc": "Port frequency among current open-port records.",
+    "ports_port_donut_title": "Port Range Distribution",
+    "ports_port_donut_desc": "Distribution of open-port records by well-known/registered/dynamic ranges.",
     "ports_port_total": "Port Hits",
+    "port_bucket_well_known": "Well-known (0-1023)",
+    "port_bucket_registered": "Registered (1024-49151)",
+    "port_bucket_dynamic": "Dynamic (49152-65535)",
     "ports_chart_other": "Other",
     "ports_search_placeholder": "Filter by IP / port / service / protocol",
     "ports_filtered_rows": "{{count}} rows matched (total {{total}})",
@@ -297,6 +302,8 @@
     "paused": "Paused"
   },
   "titlebar": {
+    "mobile_running_tasks": "Running Tasks",
+    "mobile_connected_backends": "Connected Backends",
     "window_controls": {
       "close": "Close",
       "minimize": "Minimize",
