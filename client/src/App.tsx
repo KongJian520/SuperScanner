@@ -10,6 +10,7 @@ import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-
 import { useAppStore } from './lib/store';
 import { isMac } from './lib/platform';
 import { routeLite } from './lib/motion';
+import { preloadAllRoutes } from './lib/preload';
 
 const TasksOverview = lazy(() => import('./views/TasksOverview'));
 const DashboardOverview = lazy(() => import('./views/DashboardOverview'));
@@ -50,6 +51,24 @@ const App: React.FC = () => {
       setActiveTab('tasks');
     }
   }, [location.pathname, setActiveTab]);
+
+  useEffect(() => {
+    const boot = (window as Window & {
+      __SS_BOOT__?: { setProgress: (value: number) => void; done: () => void };
+    }).__SS_BOOT__;
+    boot?.setProgress(82);
+    preloadAllRoutes();
+  }, []);
+
+  useEffect(() => {
+    const boot = (window as Window & {
+      __SS_BOOT__?: { setProgress: (value: number) => void; done: () => void };
+    }).__SS_BOOT__;
+    const rafId = window.requestAnimationFrame(() => {
+      boot?.done();
+    });
+    return () => window.cancelAnimationFrame(rafId);
+  }, []);
 
   // 修饰键跟随系统：macOS 用 meta，Windows/Linux 用 ctrl
   const mod = isMac ? 'meta' : 'ctrl';

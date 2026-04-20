@@ -48,11 +48,113 @@
       mask-image: linear-gradient(to right, rgba(0, 0, 0, 1) 20%, rgba(0, 0, 0, 0) 100%);
       -webkit-mask-image: linear-gradient(to right, rgba(0, 0, 0, 1) 20%, rgba(0, 0, 0, 0) 100%);
     }
+
+    #boot-splash {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      display: grid;
+      place-items: center;
+      background: radial-gradient(circle at 20% 20%, #111827 0%, #06070a 48%, #020307 100%);
+      color: #d4d4d8;
+      transition: opacity 260ms ease, transform 260ms ease;
+    }
+
+    #boot-splash.is-done {
+      opacity: 0;
+      transform: scale(1.01);
+      pointer-events: none;
+    }
+
+    .boot-shell {
+      width: min(460px, 82vw);
+      border: 1px solid rgba(82, 82, 91, 0.55);
+      border-radius: 14px;
+      padding: 20px;
+      background: rgba(9, 9, 11, 0.78);
+      backdrop-filter: blur(6px);
+      box-shadow: 0 12px 38px rgba(0, 0, 0, 0.35);
+    }
+
+    .boot-title {
+      font-size: 13px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #a1a1aa;
+      margin-bottom: 10px;
+    }
+
+    .boot-progress {
+      position: relative;
+      overflow: hidden;
+      height: 7px;
+      border-radius: 999px;
+      background: rgba(39, 39, 42, 0.95);
+      border: 1px solid rgba(63, 63, 70, 0.95);
+    }
+
+    .boot-progress-fill {
+      height: 100%;
+      width: 100%;
+      transform-origin: left center;
+      transform: scaleX(0.08);
+      background: linear-gradient(90deg, #38bdf8, #22c55e, #a855f7);
+      transition: transform 220ms ease-out;
+    }
   </style>
 </head>
 
 <body>
+  <div id="boot-splash">
+    <div class="boot-shell">
+      <div class="boot-title">SuperScanner Bootstrapping</div>
+      <div class="boot-progress">
+        <div id="boot-progress-fill" class="boot-progress-fill"></div>
+      </div>
+    </div>
+  </div>
   <div id="root"></div>
+  <script>
+    (() => {
+      const splash = document.getElementById('boot-splash');
+      const fill = document.getElementById('boot-progress-fill');
+      if (!splash || !fill) return;
+
+      let progress = 8;
+      let finished = false;
+
+      const draw = (value) => {
+        progress = Math.max(0, Math.min(100, value));
+        fill.style.transform = `scaleX(${progress / 100})`;
+      };
+
+      const setProgress = (value) => {
+        if (finished) return;
+        if (Number.isFinite(value)) {
+          draw(Math.max(progress, value));
+        }
+      };
+
+      const done = () => {
+        if (finished) return;
+        finished = true;
+        draw(100);
+        splash.classList.add('is-done');
+        window.setTimeout(() => splash.remove(), 320);
+      };
+
+      const ticker = window.setInterval(() => {
+        if (finished) {
+          window.clearInterval(ticker);
+          return;
+        }
+        if (progress < 42) draw(progress + 2);
+      }, 85);
+
+      window.__SS_BOOT__ = { setProgress, done };
+      window.addEventListener('beforeunload', () => window.clearInterval(ticker), { once: true });
+    })();
+  </script>
   <script type="module" src="/src/main.tsx"></script>
 </body>
 

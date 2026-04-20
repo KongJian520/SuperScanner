@@ -7,6 +7,14 @@ import { HashRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from 'next-themes';
 
+type BootController = {
+  setProgress: (value: number) => void;
+  done: () => void;
+};
+
+const boot = (window as Window & { __SS_BOOT__?: BootController }).__SS_BOOT__;
+boot?.setProgress(56);
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -16,6 +24,8 @@ const queryClient = new QueryClient({
     },
   },
 });
+
+boot?.setProgress(72);
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
