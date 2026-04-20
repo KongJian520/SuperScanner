@@ -1,6 +1,6 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowLeft, CircleHelp, Gauge, Layers, Search } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
@@ -32,6 +32,7 @@ function compactTop(items: { name: string; count: number }[], otherLabel: string
 
 export const TaskPortsDetail: React.FC<TaskPortsDetailProps> = ({ task, embedded = false }) => {
   const { t } = useTranslation();
+  const location = useLocation();
   const results = task.results || [];
   const openResults = useMemo(() => results.filter((r) => r.state?.toLowerCase() === 'open'), [results]);
   const rows = openResults.length > 0 ? openResults : results;
@@ -41,8 +42,13 @@ export const TaskPortsDetail: React.FC<TaskPortsDetailProps> = ({ task, embedded
   const uniquePortsCount = new Set(rows.map((r) => r.port)).size;
 
   const [detailMode, setDetailMode] = useState<'visual' | 'table'>('visual');
-  const [search, setSearch] = useState('');
+  const searchFromRoute = useMemo(() => new URLSearchParams(location.search).get('q')?.trim() ?? '', [location.search]);
+  const [search, setSearch] = useState(searchFromRoute);
   const [selectedService, setSelectedService] = useState<string | null>(null);
+
+  useEffect(() => {
+    setSearch(searchFromRoute);
+  }, [searchFromRoute]);
 
   const serviceDistribution = useMemo(() => {
     const map = new Map<string, number>();
@@ -55,30 +61,9 @@ export const TaskPortsDetail: React.FC<TaskPortsDetailProps> = ({ task, embedded
       .sort((a, b) => b.count - a.count);
   }, [rows, t]);
 
-  const portRangeDistribution = useMemo(() => {
-    const buckets = [
-      { name: t('task_detail.port_bucket_well_known'), min: 0, max: 1023, count: 0 },
-      { name: t('task_detail.port_bucket_registered'), min: 1024, max: 49151, count: 0 },
-      { name: t('task_detail.port_bucket_dynamic'), min: 49152, max: 65535, count: 0 },
-    ];
-    for (const row of rows) {
-      const port = Number(row.port);
-      if (!Number.isFinite(port)) continue;
-      const bucket = buckets.find((item) => port >= item.min && port <= item.max);
-      if (bucket) bucket.count += 1;
-    }
-    return buckets
-      .filter((item) => item.count > 0)
-      .map(({ name, count }) => ({ name, count }));
-  }, [rows, t]);
-
   const serviceDonutData = useMemo(
     () => compactTop(serviceDistribution, t('task_detail.ports_chart_other')),
     [serviceDistribution, t],
-  );
-  const portDonutData = useMemo(
-    () => portRangeDistribution.map((item) => ({ name: item.name, value: item.count })),
-    [portRangeDistribution],
   );
 
   const filteredRows = useMemo(() => {
@@ -97,7 +82,6 @@ export const TaskPortsDetail: React.FC<TaskPortsDetailProps> = ({ task, embedded
   }, [rows, search, selectedService, t]);
 
   const serviceTotal = serviceDonutData.reduce((sum, item) => sum + item.value, 0);
-  const portTotal = portDonutData.reduce((sum, item) => sum + item.value, 0);
 
   const statsGrid = (
     <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
@@ -153,10 +137,10 @@ export const TaskPortsDetail: React.FC<TaskPortsDetailProps> = ({ task, embedded
         </div>
       </CardHeader>
       <CardContent className="px-3 sm:px-4 min-h-0 space-y-2">
-        <div className="relative h-[270px] sm:h-[300px] lg:h-[320px]">
+        <div className="relative aspect-square w-full max-w-[360px] mx-auto">
           {data.length > 0 ? (
             <>
-              <div className="h-full w-full max-w-[360px] sm:max-w-[400px] mx-auto">
+              <div className="h-full w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
@@ -166,6 +150,8 @@ export const TaskPortsDetail: React.FC<TaskPortsDetailProps> = ({ task, embedded
                       innerRadius="58%"
                       outerRadius="84%"
                       paddingAngle={2}
+                      labelLine={false}
+                      label={({ name }) => String(name ?? '')}
                       onClick={(_, index) => {
                         if (onItemClick) onItemClick(data[index]);
                       }}
@@ -179,7 +165,7 @@ export const TaskPortsDetail: React.FC<TaskPortsDetailProps> = ({ task, embedded
                       ))}
                     </Pie>
                     <Tooltip
-                      formatter={(value) => [value, t('task_detail.label_open_ports')]}
+                      formatter={(value, name) => [value, String(name ?? '')]}
                       contentStyle={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: '8px' }}
                     />
                   </PieChart>
@@ -229,7 +215,7 @@ export const TaskPortsDetail: React.FC<TaskPortsDetailProps> = ({ task, embedded
   );
 
   const distributionPanel = (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 min-h-0 shrink-0">
+    <div className="grid grid-cols-1 gap-3 min-h-0 shrink-0">
       {donutBlock(
         t('task_detail.ports_service_donut_title'),
         t('task_detail.ports_service_donut_desc'),
@@ -242,13 +228,6 @@ export const TaskPortsDetail: React.FC<TaskPortsDetailProps> = ({ task, embedded
           setSelectedService((prev) => (prev === nextFilter ? null : nextFilter));
         },
         selectedService,
-      )}
-      {donutBlock(
-        t('task_detail.ports_port_donut_title'),
-        t('task_detail.ports_port_donut_desc'),
-        t('task_detail.ports_port_total'),
-        portDonutData,
-        portTotal,
       )}
     </div>
   );

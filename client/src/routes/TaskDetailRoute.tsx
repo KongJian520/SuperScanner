@@ -6,6 +6,7 @@ import { TaskDetail } from '@/views/TaskDetail';
 import { useTaskDetail, useBackends, useTaskEvents } from '../hooks/use-scanner-api';
 import { useAppStore } from '../lib/store';
 import { routeLite, stateTransition } from '../lib/motion';
+import { pickEffectiveBackendId } from '../lib/backend-selection';
 
 export const TaskDetailRoute: React.FC = () => {
   const { t } = useTranslation();
@@ -13,7 +14,7 @@ export const TaskDetailRoute: React.FC = () => {
   const { activeBackendId, defaultBackendId } = useAppStore();
   const { data: backends } = useBackends();
   
-  const effectiveBackendId = activeBackendId ?? defaultBackendId ?? backends?.find(b => b.address)?.id ?? null;
+  const effectiveBackendId = pickEffectiveBackendId(backends, activeBackendId, defaultBackendId);
   const { data: task, isLoading, error } = useTaskDetail(effectiveBackendId, id ?? null);
   
   // Enable real-time updates for this task

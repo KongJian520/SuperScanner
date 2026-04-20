@@ -70,6 +70,11 @@ const App: React.FC = () => {
     return () => window.cancelAnimationFrame(rafId);
   }, []);
 
+  useEffect(() => {
+    document.body.classList.toggle('motion-reduced-body', motionLevel === 'reduced');
+    return () => document.body.classList.remove('motion-reduced-body');
+  }, [motionLevel]);
+
   // 修饰键跟随系统：macOS 用 meta，Windows/Linux 用 ctrl
   const mod = isMac ? 'meta' : 'ctrl';
 
@@ -118,9 +123,10 @@ const App: React.FC = () => {
                   <Route path="/task/:id/results" element={<Navigate to="ports" replace />} />
                   <Route path="/task/:id/results/:section" element={<TaskResultRoute />} />
                   <Route path="/servers" element={<ServersOverview />} />
-                  <Route path="/servers/new" element={<NewBackendDialog open={true} onCancel={() => window.history.back()} />} />
+                  <Route path="/servers/new" element={<NewBackendDialog open={true} onCancel={() => navigate('/servers')} />} />
                   <Route path="/server/:id" element={<ServerDetailRoute />} />
                   <Route path="/settings" element={<SettingsView />} />
+                  <Route path="*" element={<Navigate to="/dashboard" replace />} />
                 </Routes>
               </Suspense>
             </motion.div>

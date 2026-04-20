@@ -9,6 +9,7 @@ import { useNavigate, useMatch } from 'react-router-dom';
 import { useAppStore } from '../lib/store';
 import { useBackendHealth, useBackends, useTasks, useDeleteBackend, useDeleteTask, useTaskEvents } from '../hooks/use-scanner-api';
 import { navMotion } from '../lib/motion';
+import { pickEffectiveBackendId } from '../lib/backend-selection';
 
 const TaskEventListener: React.FC<{ backendId: string | null; taskId: string }> = ({ backendId, taskId }) => {
   useTaskEvents(backendId, taskId);
@@ -45,14 +46,14 @@ export const SidebarPanel: React.FC = () => {
   const { isSidebarOpen, activeTab, activeBackendId, defaultBackendId, activeTaskId, setActiveTaskId, setActiveBackendId, setDefaultBackendId } = useAppStore();
   const { data: backends = [] } = useBackends();
   const { data: backendHealth = {} } = useBackendHealth(backends);
-  const effectiveBackendId = activeBackendId ?? defaultBackendId ?? backends.find(b => b.address)?.id ?? null;
+  const effectiveBackendId = pickEffectiveBackendId(backends, activeBackendId, defaultBackendId);
   const { data: tasks = [] } = useTasks(effectiveBackendId);
   const { mutate: deleteBackend } = useDeleteBackend();
   const { mutate: deleteTask } = useDeleteTask();
 
   const tab = activeTab === 'servers' ? 'backends' : 'tasks';
 
-  const handleSelectTask = (id: string) => { setActiveTaskId(id); setActiveBackendId(null); navigate(`/task/${id}`); };
+  const handleSelectTask = (id: string) => { setActiveTaskId(id); setActiveBackendId(effectiveBackendId); navigate(`/task/${id}`); };
   const handleSelectBackend = (id: string) => {
     setActiveBackendId(id);
     setDefaultBackendId(id);

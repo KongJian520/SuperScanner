@@ -6,6 +6,7 @@ import { useTaskDetail, useBackends, useTaskEvents } from '../hooks/use-scanner-
 import { useAppStore } from '../lib/store';
 import { TaskDetail, TaskDetailSection } from '../views/TaskDetail';
 import { routeLite, stateTransition } from '../lib/motion';
+import { pickEffectiveBackendId } from '../lib/backend-selection';
 
 const isTaskDetailSection = (section: string): section is TaskDetailSection => (
   section === 'assets' || section === 'alive' || section === 'ports' || section === 'vulns'
@@ -17,7 +18,7 @@ export const TaskResultRoute: React.FC = () => {
   const { activeBackendId, defaultBackendId } = useAppStore();
   const { data: backends } = useBackends();
 
-  const effectiveBackendId = activeBackendId ?? defaultBackendId ?? backends?.find(b => b.address)?.id ?? null;
+  const effectiveBackendId = pickEffectiveBackendId(backends, activeBackendId, defaultBackendId);
   const { data: task, isLoading, error } = useTaskDetail(effectiveBackendId, id ?? null);
 
   useTaskEvents(effectiveBackendId, id ?? null);

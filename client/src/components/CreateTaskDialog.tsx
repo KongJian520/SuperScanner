@@ -10,11 +10,13 @@ import { Server, Check } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { ScanType, Workflow, WorkflowStep } from '../types';
+import { useAppStore } from '../lib/store';
 
 export const CreateTaskDialog: React.FC = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { data: availableBackends = [] } = useBackends();
+  const { defaultBackendId } = useAppStore();
   const { mutateAsync: createTask, isPending: isSubmitting } = useCreateTask();
   
   const [name, setName] = useState('');
@@ -52,6 +54,14 @@ export const CreateTaskDialog: React.FC = () => {
     setPocEnabled(false);
     setPocTools([]);
   }, [pocEnabled, nucleiAvailable]);
+
+  React.useEffect(() => {
+    if (selectedBackendId && availableBackends.some((backend) => backend.id === selectedBackendId)) return;
+    const preferred =
+      availableBackends.find((backend) => backend.id === defaultBackendId)
+      ?? availableBackends[0];
+    setSelectedBackendId(preferred?.id ?? null);
+  }, [availableBackends, defaultBackendId, selectedBackendId]);
 
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();

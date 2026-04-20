@@ -6,6 +6,7 @@ import { isMac, isWindows, isTauri } from '../lib/platform';
 import { useBackends, useTasks } from '../hooks/use-scanner-api';
 import { useAppStore } from '../lib/store';
 import { TaskStatus } from '../types';
+import { pickEffectiveBackendId } from '../lib/backend-selection';
 
 const getWindow = () => {
   try {
@@ -95,7 +96,7 @@ export const Titlebar: React.FC = () => {
   const menuBarRef = useRef<HTMLDivElement>(null);
   const { activeBackendId, defaultBackendId } = useAppStore();
   const { data: backends = [] } = useBackends();
-  const effectiveBackendId = activeBackendId ?? defaultBackendId ?? backends.find((b) => b.address)?.id ?? null;
+  const effectiveBackendId = pickEffectiveBackendId(backends, activeBackendId, defaultBackendId);
   const { data: tasks = [] } = useTasks(effectiveBackendId);
   const runningTasks = tasks.filter((task) => task.status === TaskStatus.RUNNING).length;
 
@@ -124,8 +125,9 @@ export const Titlebar: React.FC = () => {
     {
       label: t('menu.view'),
       items: [
-        { label: t('menu.tasks'), action: () => navigate('/tasks'), shortcut: `${mod}1` },
-        { label: t('menu.servers'), action: () => navigate('/servers'), shortcut: `${mod}2` },
+        { label: t('activity_bar.dashboard'), action: () => navigate('/dashboard'), shortcut: `${mod}1` },
+        { label: t('menu.tasks'), action: () => navigate('/tasks'), shortcut: `${mod}2` },
+        { label: t('menu.servers'), action: () => navigate('/servers'), shortcut: `${mod}3` },
       ],
     },
     {

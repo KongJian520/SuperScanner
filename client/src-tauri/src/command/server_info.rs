@@ -44,12 +44,12 @@ pub async fn add_backend_with_probe(
     address: String,
     description: Option<String>,
     use_tls: Option<bool>,
-) -> Result<()> {
+) -> Result<config::BackendRecord> {
     let use_tls = use_tls.unwrap_or(false);
     info!(%name, %address, use_tls, "add_backend_with_probe called");
     let _server_info = probe_server_info(state, address.clone(), use_tls).await?;
     info!(%address, "probe successful, saving backend record");
-    config::save_backend(config::BackendRecord {
+    let saved = config::save_backend(config::BackendRecord {
         id: Uuid::new_v4().to_string(),
         name,
         address,
@@ -60,7 +60,7 @@ pub async fn add_backend_with_probe(
     .await
     .context("Failed to save backend record")?;
     info!("add_backend_with_probe completed and backend saved");
-    Ok(())
+    Ok(saved)
 }
 
 #[tauri::command]

@@ -4,6 +4,24 @@ import { listen } from '@tauri-apps/api/event';
 import * as api from '../lib/api';
 import { BackendConfig, Task, TaskStatus } from '../types';
 import { toast } from 'sonner';
+import i18n from '../lib/i18n';
+
+const getErrorMessage = (err: unknown): string => {
+  if (err instanceof Error) return err.message;
+  return String(err ?? 'Unknown error');
+};
+
+const parseTs = (ts: unknown): number | undefined => {
+  if (typeof ts === 'number') return Number.isFinite(ts) ? ts : undefined;
+  if (typeof ts === 'string') {
+    const parsed = Date.parse(ts);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+  return undefined;
+};
+
+const sanitizeEventSegment = (value: string): string =>
+  value.replace(/[^a-zA-Z0-9]/g, '_');
 
 // --- Backends ---
 
@@ -29,10 +47,10 @@ export function useAddBackend() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['backends'] });
-      toast.success('后端添加成功');
+      toast.success(i18n.t('toast.backend_add_success', { defaultValue: 'Backend added successfully' }));
     },
     onError: (err) => {
-      toast.error(`添加后端失败: ${err.message}`);
+      toast.error(i18n.t('toast.backend_add_error', { defaultValue: 'Failed to add backend: {{message}}', message: getErrorMessage(err) }));
     },
   });
 }
@@ -47,10 +65,10 @@ export function useDeleteBackend() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['backends'] });
-      toast.success('后端已删除');
+      toast.success(i18n.t('toast.backend_delete_success', { defaultValue: 'Backend deleted' }));
     },
     onError: (err) => {
-      toast.error(`删除后端失败: ${err.message}`);
+      toast.error(i18n.t('toast.backend_delete_error', { defaultValue: 'Failed to delete backend: {{message}}', message: getErrorMessage(err) }));
     },
   });
 }
@@ -110,16 +128,15 @@ function applyTaskUpdate(t: Task, payload: any): Task {
     const nextStatus = snap.status ?? t.status;
     const incomingProgress = snap.progress ?? t.progress;
     const newProgress = stabilizeProgress(t.progress, incomingProgress, nextStatus);
-    const parseTs = (ts: any) => typeof ts === 'string' ? Date.parse(ts) : (typeof ts === 'number' ? ts : undefined);
     return {
       ...t,
       status: nextStatus,
       progress: newProgress,
-      exitCode: snap.exit_code,
-      errorMessage: snap.error_message,
-      startedAt: snap.started_at ? parseTs(snap.started_at) : t.startedAt,
-      finishedAt: snap.finished_at ? parseTs(snap.finished_at) : t.finishedAt,
-      updatedAt: snap.updated_at ? parseTs(snap.updated_at) : t.updatedAt,
+      exitCode: snap.exitCode,
+      errorMessage: snap.errorMessage,
+      startedAt: parseTs(snap.startedAt) ?? t.startedAt,
+      finishedAt: parseTs(snap.finishedAt) ?? t.finishedAt,
+      updatedAt: parseTs(snap.updatedAt) ?? t.updatedAt,
     };
   }
   return t;
@@ -129,6 +146,7 @@ function applyTaskUpdate(t: Task, payload: any): Task {
 type ActiveListener = { count: number; unlisten?: () => void; removed?: boolean };
 const activeTaskListeners: Map<string, ActiveListener> = new Map();
 const bootstrappedTaskStreams: Set<string> = new Set();
+const reconnectingTaskStreams: Set<string> = new Set();
 
 export function useTaskEvents(backendId: string | null, taskId: string | null) {
   const { data: backends } = useBackends();
@@ -138,50 +156,88 @@ export function useTaskEvents(backendId: string | null, taskId: string | null) {
   useEffect(() => {
     if (!backend?.address || !taskId) return;
     const streamKey = `${backendId ?? 'default'}:${taskId}`;
+    const eventName = `task-event://${sanitizeEventSegment(backend.address)}::${taskId}`;
 
     let localRemoved = false;
+    let frameId: number | null = null;
+    const pendingPayloads: any[] = [];
+
+    const flushPending = () => {
+      frameId = null;
+      if (pendingPayloads.length === 0) return;
+      const payloads = pendingPayloads.splice(0, pendingPayloads.length);
+
+      queryClient.setQueryData(['tasks', backendId], (oldTasks: Task[] | undefined) => {
+        if (!oldTasks) return oldTasks;
+        return oldTasks.map((task) => {
+          if (task.id !== taskId) return task;
+          return payloads.reduce((nextTask, payload) => applyTaskUpdate(nextTask, payload), task);
+        });
+      });
+
+      queryClient.setQueryData(['task', backendId, taskId], (oldTask: Task | undefined) => {
+        if (!oldTask) return oldTask;
+        return payloads.reduce((nextTask, payload) => applyTaskUpdate(nextTask, payload), oldTask);
+      });
+    };
+
+    const queuePayload = (payload: any) => {
+      pendingPayloads.push(payload);
+      if (frameId !== null) return;
+      frameId = window.requestAnimationFrame(flushPending);
+    };
 
     const startListening = async () => {
-      const existing = activeTaskListeners.get(taskId);
+      const existing = activeTaskListeners.get(streamKey);
       if (existing) {
         existing.count += 1;
         return;
       }
 
       // Reserve entry immediately to avoid races from concurrent mounts
-      activeTaskListeners.set(taskId, { count: 1, unlisten: undefined, removed: false });
+      activeTaskListeners.set(streamKey, { count: 1, unlisten: undefined, removed: false });
 
       if (!bootstrappedTaskStreams.has(streamKey)) {
         try {
           await api.streamTaskEvents(backend.address!, taskId, !!backend.useTls);
           bootstrappedTaskStreams.add(streamKey);
         } catch {
-          const cur = activeTaskListeners.get(taskId);
-          if (cur && cur.count <= 1) activeTaskListeners.delete(taskId);
+          const cur = activeTaskListeners.get(streamKey);
+          if (cur && cur.count <= 1) activeTaskListeners.delete(streamKey);
           return;
         }
       }
 
-      const unlisten = await listen(`task-event://${taskId}`, (event: any) => {
+      const unlisten = await listen(eventName, (event: any) => {
         const payload = event.payload;
+        if (payload?.type === 'Error') {
+          const message = getErrorMessage(payload?.payload?.message ?? payload?.payload);
+          toast.error(i18n.t('toast.task_stream_error', { defaultValue: 'Task event stream disconnected: {{message}}', message }));
+          bootstrappedTaskStreams.delete(streamKey);
 
-        queryClient.setQueryData(['tasks', backendId], (oldTasks: Task[] | undefined) => {
-          if (!oldTasks) return oldTasks;
-          return oldTasks.map(t => t.id !== taskId ? t : applyTaskUpdate(t, payload));
-        });
+          if (!reconnectingTaskStreams.has(streamKey)) {
+            reconnectingTaskStreams.add(streamKey);
+            void api
+              .streamTaskEvents(backend.address!, taskId, !!backend.useTls)
+              .then((res) => {
+                if (res.ok) bootstrappedTaskStreams.add(streamKey);
+              })
+              .finally(() => {
+                reconnectingTaskStreams.delete(streamKey);
+              });
+          }
+          return;
+        }
 
-        queryClient.setQueryData(['task', backendId, taskId], (oldTask: Task | undefined) => {
-          if (!oldTask) return oldTask;
-          return applyTaskUpdate(oldTask, payload);
-        });
+        queuePayload(payload);
       });
 
-      const cur = activeTaskListeners.get(taskId);
+      const cur = activeTaskListeners.get(streamKey);
       if (cur) {
         cur.unlisten = unlisten;
         if (cur.removed) {
           unlisten();
-          activeTaskListeners.delete(taskId);
+          activeTaskListeners.delete(streamKey);
         }
       }
     };
@@ -190,12 +246,19 @@ export function useTaskEvents(backendId: string | null, taskId: string | null) {
 
     return () => {
       localRemoved = true;
-      const existing = activeTaskListeners.get(taskId);
+      if (frameId !== null) {
+        window.cancelAnimationFrame(frameId);
+        frameId = null;
+      }
+      pendingPayloads.length = 0;
+      const existing = activeTaskListeners.get(streamKey);
       if (existing) {
         existing.count -= 1;
         if (existing.count <= 0) {
           if (existing.unlisten) existing.unlisten();
-          activeTaskListeners.delete(taskId);
+          activeTaskListeners.delete(streamKey);
+          bootstrappedTaskStreams.delete(streamKey);
+          reconnectingTaskStreams.delete(streamKey);
         } else if (localRemoved) {
           existing.removed = true;
         }
@@ -263,10 +326,10 @@ export function useCreateTask() {
         return [...oldTasks, _data];
       });
       queryClient.invalidateQueries({ queryKey: ['tasks', variables.backendId] });
-      toast.success('任务创建成功');
+      toast.success(i18n.t('toast.task_create_success', { defaultValue: 'Task created successfully' }));
     },
     onError: (err) => {
-      toast.error(`创建任务失败: ${err.message}`);
+      toast.error(i18n.t('toast.task_create_error', { defaultValue: 'Failed to create task: {{message}}', message: getErrorMessage(err) }));
     },
   });
 }
@@ -285,10 +348,10 @@ export function useDeleteTask() {
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['tasks', variables.backendId] });
-      toast.success('任务已删除');
+      toast.success(i18n.t('toast.task_delete_success', { defaultValue: 'Task deleted' }));
     },
     onError: (err) => {
-      toast.error(`删除任务失败: ${err.message}`);
+      toast.error(i18n.t('toast.task_delete_error', { defaultValue: 'Failed to delete task: {{message}}', message: getErrorMessage(err) }));
     },
   });
 }
@@ -311,10 +374,10 @@ export function useStartTask() {
         return oldTasks.map(t => t.id === variables.taskId ? { ...t, status: TaskStatus.RUNNING } : t);
       });
       queryClient.invalidateQueries({ queryKey: ['tasks', variables.backendId] });
-      toast.success('任务已启动');
+      toast.success(i18n.t('toast.task_start_success', { defaultValue: 'Task started' }));
     },
     onError: (err) => {
-      toast.error(`启动失败: ${err.message}`);
+      toast.error(i18n.t('toast.task_start_error', { defaultValue: 'Failed to start task: {{message}}', message: getErrorMessage(err) }));
     },
   });
 }
@@ -333,10 +396,10 @@ export function useStopTask() {
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['tasks', variables.backendId] });
-      toast.success('任务已停止');
+      toast.success(i18n.t('toast.task_stop_success', { defaultValue: 'Task stopped' }));
     },
     onError: (err) => {
-      toast.error(`停止失败: ${err.message}`);
+      toast.error(i18n.t('toast.task_stop_error', { defaultValue: 'Failed to stop task: {{message}}', message: getErrorMessage(err) }));
     },
   });
 }

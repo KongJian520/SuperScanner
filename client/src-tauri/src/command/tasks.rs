@@ -6,6 +6,13 @@ use tauri::{Emitter, State};
 use crate::error::Result;
 use anyhow::Context;
 
+fn sanitize_event_segment(input: &str) -> String {
+    input
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
+        .collect()
+}
+
 #[tauri::command]
 pub async fn list_tasks(
     state: State<'_, AppState>,
@@ -148,6 +155,7 @@ pub async fn stream_task_events(
 ) -> Result<()> {
     let use_tls = use_tls.unwrap_or(false);
     info!(%address, %id, "stream_task_events called");
+    let event_topic = format!("task-event://{}::{}", sanitize_event_segment(&address), id);
 
     // 提前获取 channel，避免 state 生命周期问题
     let ch = state.channel_for(
@@ -163,6 +171,7 @@ pub async fn stream_task_events(
 
     tauri::async_runtime::spawn(async move {
         let mut client = crate::command::tasks_proto::tasks_client::TasksClient::new(ch);
+        let event_topic = event_topic.clone();
 
         let req = tonic::Request::new(crate::command::tasks_proto::StreamTaskEventsRequest {
             id: id.clone(),
@@ -176,7 +185,7 @@ pub async fn stream_task_events(
                 let mut stream = resp.into_inner();
                 while let Ok(Some(event)) = stream.message().await {
                     if let Some(dto) = convert::task_event_from_proto(event) {
-                        if let Err(e) = window.emit(&format!("task-event://{}", id), dto) {
+                        if let Err(e) = window.emit(&event_topic, dto) {
                             tracing::error!("failed to emit event: {}", e);
                             break;
                         }
@@ -185,7 +194,7 @@ pub async fn stream_task_events(
             }
             Err(e) => {
                 let _ = window.emit(
-                    &format!("task-event://{}", id),
+                    &event_topic,
                     crate::utils::dto::TaskEventDto::Error(crate::utils::dto::ErrorDto { message: e.to_string() }),
                 );
             }

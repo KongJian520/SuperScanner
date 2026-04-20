@@ -52,7 +52,7 @@ pub async fn load_backends() -> Result<Vec<BackendRecord>> {
     Ok(v)
 }
 
-pub async fn save_backend(record: BackendRecord) -> Result<()> {
+pub async fn save_backend(record: BackendRecord) -> Result<BackendRecord> {
     let dir = config_dir();
     fs::create_dir_all(&dir).await?;
     let mut v = load_backends().await?;
@@ -88,7 +88,8 @@ pub async fn save_backend(record: BackendRecord) -> Result<()> {
 
     // replace records with same name (allowing multiple same-name entries if desired by id)
     v.retain(|r| r.name != new_record.name || r.id != new_record.id);
-    // capture values for logging before moving the record into the vector
+    // capture values for logging/return before moving the record into the vector
+    let saved_record = new_record.clone();
     let saved_name = new_record.name.clone();
     let saved_id = new_record.id.clone();
     v.push(new_record);
@@ -115,7 +116,7 @@ pub async fn save_backend(record: BackendRecord) -> Result<()> {
 
     info!(name = %saved_name, id = %saved_id, "save_backend completed");
 
-    Ok(())
+    Ok(saved_record)
 }
 
 pub async fn delete_backend(identifier: &str) -> Result<()> {

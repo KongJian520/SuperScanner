@@ -4,14 +4,15 @@ import { useTranslation } from 'react-i18next';
 import { useTaskDetail, useBackends, useTaskEvents } from '../hooks/use-scanner-api';
 import { useAppStore } from '../lib/store';
 import TaskPortsDetail from '../views/TaskPortsDetail';
+import { pickEffectiveBackendId } from '../lib/backend-selection';
 
 export const TaskPortsRoute: React.FC = () => {
   const { t } = useTranslation();
   const { id } = useParams();
-  const { activeBackendId } = useAppStore();
+  const { activeBackendId, defaultBackendId } = useAppStore();
   const { data: backends } = useBackends();
 
-  const effectiveBackendId = activeBackendId ?? backends?.find(b => b.address)?.id ?? null;
+  const effectiveBackendId = pickEffectiveBackendId(backends, activeBackendId, defaultBackendId);
   const { data: task, isLoading } = useTaskDetail(effectiveBackendId, id ?? null);
 
   useTaskEvents(effectiveBackendId, id ?? null);

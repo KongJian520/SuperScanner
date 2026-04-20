@@ -2,15 +2,20 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import {
+  ArrowUpDown,
   ArrowLeft,
+  Copy,
   Database,
+  Download,
   Folder,
   Globe,
   Layers,
   Network,
+  Search,
   Shield,
   Terminal,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { ScanType, Task, VulnerabilityRecord } from '../types';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
 
@@ -74,6 +79,29 @@ const componentByService: Record<string, string> = {
 const dedupeSort = (items: string[]) => Array.from(new Set(items.filter(Boolean))).sort((a, b) => a.localeCompare(b));
 
 const toServiceKey = (service: string) => service.trim().toLowerCase().replace(/[^a-z0-9]+/g, '');
+const compareIp = (a: string, b: string) => {
+  const ap = a.split('.').map((v) => Number.parseInt(v, 10));
+  const bp = b.split('.').map((v) => Number.parseInt(v, 10));
+  if (ap.length === 4 && bp.length === 4 && ap.every(Number.isFinite) && bp.every(Number.isFinite)) {
+    for (let i = 0; i < 4; i += 1) {
+      if (ap[i] !== bp[i]) return ap[i] - bp[i];
+    }
+    return 0;
+  }
+  return a.localeCompare(b);
+};
+
+const downloadTextFile = (content: string, fileName: string, mimeType: string) => {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = fileName;
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  URL.revokeObjectURL(url);
+};
 
 const hostIconByRole: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
   web: Globe,
@@ -129,11 +157,44 @@ export const TaskResultPlaceholderDetail: React.FC<TaskResultPlaceholderDetailPr
   const hostProfiles = buildHostProfiles(task);
   const hasPocStep = task.workflow?.steps?.some((step) => step.type === ScanType.Poc) ?? false;
   const [selectedHost, setSelectedHost] = React.useState<HostProfile | null>(null);
+  const [assetSearch, setAssetSearch] = React.useState('');
+  const [assetRoleFilter, setAssetRoleFilter] = React.useState<string | null>(null);
+  const [aliveSearch, setAliveSearch] = React.useState('');
+  const [aliveSortDir, setAliveSortDir] = React.useState<'asc' | 'desc'>('asc');
   const [pages, setPages] = React.useState<Record<'assets' | 'alive' | 'vulns', number>>({
     assets: 1,
     alive: 1,
     vulns: 1,
   });
+
+  const assetRoleOptions = React.useMemo(
+    () =>
+      Array.from(
+        new Set(hostProfiles.flatMap((host) => host.roles).filter(Boolean)),
+      ).sort((a, b) => a.localeCompare(b)),
+    [hostProfiles],
+  );
+
+  const filteredHostProfiles = React.useMemo(() => {
+    const q = assetSearch.trim().toLowerCase();
+    return hostProfiles.filter((host) => {
+      if (assetRoleFilter && !host.roles.includes(assetRoleFilter)) return false;
+      if (!q) return true;
+      return (
+        host.ip.toLowerCase().includes(q)
+        || host.roles.some((role) => role.toLowerCase().includes(q))
+        || host.services.some((service) => service.toLowerCase().includes(q))
+        || host.components.some((component) => component.toLowerCase().includes(q))
+      );
+    });
+  }, [hostProfiles, assetRoleFilter, assetSearch]);
+
+  const filteredAliveIps = React.useMemo(() => {
+    const q = aliveSearch.trim().toLowerCase();
+    const rows = q ? aliveIps.filter((ip) => ip.toLowerCase().includes(q)) : aliveIps;
+    const sorted = [...rows].sort(compareIp);
+    return aliveSortDir === 'desc' ? sorted.reverse() : sorted;
+  }, [aliveIps, aliveSearch, aliveSortDir]);
 
   const parsedVulnsFromResults = results.flatMap((row): VulnerabilityRecord[] => {
     const raw = row as unknown as Record<string, unknown>;
@@ -173,6 +234,45 @@ export const TaskResultPlaceholderDetail: React.FC<TaskResultPlaceholderDetailPr
     setPages((prev) => ({ ...prev, [targetSection]: clamped }));
   };
 
+  React.useEffect(() => {
+    setPages((prev) => ({ ...prev, assets: 1 }));
+  }, [assetRoleFilter, assetSearch]);
+
+  React.useEffect(() => {
+    setPages((prev) => ({ ...prev, alive: 1 }));
+  }, [aliveSearch, aliveSortDir]);
+
+  const handleCopyAliveIps = React.useCallback(() => {
+    if (filteredAliveIps.length === 0) return;
+    const payload = filteredAliveIps.join('\n');
+    if (!navigator.clipboard?.writeText) {
+      toast.error(t('task_detail.alive_copy_unsupported', { defaultValue: 'Clipboard is unavailable in current environment' }));
+      return;
+    }
+    navigator.clipboard
+      .writeText(payload)
+      .then(() => {
+        toast.success(t('task_detail.alive_copy_success', {
+          defaultValue: 'Copied {{count}} alive IPs',
+          count: filteredAliveIps.length,
+        }));
+      })
+      .catch(() => {
+        toast.error(t('task_detail.alive_copy_failed', { defaultValue: 'Failed to copy alive IP list' }));
+      });
+  }, [filteredAliveIps, t]);
+
+  const handleExportAliveIps = React.useCallback(() => {
+    if (filteredAliveIps.length === 0) return;
+    const content = filteredAliveIps.join('\n');
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    downloadTextFile(content, `task-${task.id}-alive-ips-${stamp}.txt`, 'text/plain;charset=utf-8;');
+    toast.success(t('task_detail.alive_export_success', {
+      defaultValue: 'Exported {{count}} alive IPs',
+      count: filteredAliveIps.length,
+    }));
+  }, [filteredAliveIps, task.id, t]);
+
   const titleMap = {
     assets: t('task_detail.entry_assets_title'),
     alive: t('task_detail.entry_alive_title'),
@@ -181,7 +281,7 @@ export const TaskResultPlaceholderDetail: React.FC<TaskResultPlaceholderDetailPr
 
   const descMap = {
     assets: '',
-    alive: t('task_detail.entry_alive_desc'),
+    alive: '',
     vulns: t('task_detail.entry_vulns_desc'),
   } as const;
 
@@ -214,10 +314,47 @@ export const TaskResultPlaceholderDetail: React.FC<TaskResultPlaceholderDetailPr
   const sectionBody = (
     <>
       {section === 'assets' && (
-        hostProfiles.length > 0 ? (() => {
-          const { rows, page, totalPages } = paginate(hostProfiles, pages.assets);
+        filteredHostProfiles.length > 0 ? (() => {
+          const { rows, page, totalPages } = paginate(filteredHostProfiles, pages.assets);
           return (
             <>
+              <div className="mb-3 rounded-lg border border-border/70 bg-card/60 p-3 space-y-2.5">
+                <div className="relative">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <input
+                    value={assetSearch}
+                    onChange={(e) => setAssetSearch(e.target.value)}
+                    placeholder={t('task_detail.assets_search_placeholder', { defaultValue: 'Search by IP / role / service' })}
+                    className="h-9 w-full rounded-md border border-input bg-background pl-9 pr-3 text-sm text-foreground"
+                  />
+                </div>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setAssetRoleFilter(null)}
+                    className={`px-2 py-1 rounded-md border text-xs ${assetRoleFilter === null ? 'border-primary/45 bg-primary/15 text-foreground' : 'border-border bg-background/60 text-muted-foreground hover:text-foreground'}`}
+                  >
+                    {t('tasks_overview.filter_all')}
+                  </button>
+                  {assetRoleOptions.map((role) => (
+                    <button
+                      key={role}
+                      type="button"
+                      onClick={() => setAssetRoleFilter(role)}
+                      className={`px-2 py-1 rounded-md border text-xs ${assetRoleFilter === role ? 'border-primary/45 bg-primary/15 text-foreground' : 'border-border bg-background/60 text-muted-foreground hover:text-foreground'}`}
+                    >
+                      {role}
+                    </button>
+                  ))}
+                  <span className="ml-auto text-xs text-muted-foreground">
+                    {t('task_detail.assets_filtered_count', {
+                      defaultValue: '{{count}} / {{total}} hosts',
+                      count: filteredHostProfiles.length,
+                      total: hostProfiles.length,
+                    })}
+                  </span>
+                </div>
+              </div>
               <div className="grid grid-cols-1 min-[520px]:grid-cols-2 xl:grid-cols-3 gap-3">
                 {rows.map((host) => {
                   const HostIcon = pickHostIcon(host.roles);
@@ -225,14 +362,19 @@ export const TaskResultPlaceholderDetail: React.FC<TaskResultPlaceholderDetailPr
                     <button
                       key={host.ip}
                       type="button"
-                      className="w-full rounded-lg border border-border/70 bg-card/70 p-3 text-left hover:bg-accent/50 transition-colors"
+                      className="w-full rounded-lg border border-border/70 bg-card/70 p-3 text-left hover:bg-accent/50 hover:border-primary/30 transition-colors"
                       onClick={() => setSelectedHost(host)}
                     >
-                      <div className="flex items-center gap-2">
-                        <span className="inline-flex items-center justify-center rounded-md border border-primary/30 bg-primary/10 p-1.5 text-primary">
-                          <HostIcon size={16} />
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="inline-flex items-center justify-center rounded-md border border-primary/30 bg-primary/10 p-1.5 text-primary shrink-0">
+                            <HostIcon size={16} />
+                          </span>
+                          <p className="font-mono text-sm font-semibold text-foreground truncate">{host.ip}</p>
+                        </div>
+                        <span className="text-[11px] text-muted-foreground tabular-nums">
+                          {host.openPorts.length} / {host.services.length}
                         </span>
-                        <p className="font-mono text-sm font-semibold text-foreground truncate">{host.ip}</p>
                       </div>
                       <p className="mt-2 text-xs text-muted-foreground truncate">{host.roles.join(', ')}</p>
                       <p className="mt-1 text-xs text-muted-foreground">
@@ -246,28 +388,76 @@ export const TaskResultPlaceholderDetail: React.FC<TaskResultPlaceholderDetailPr
             </>
           );
         })() : (
-          <div className="text-sm text-muted-foreground">{t('task_detail.no_results')}</div>
+          <div className="text-sm text-muted-foreground">
+            {hostProfiles.length > 0 ? t('tasks_overview.no_filter_match') : t('task_detail.no_results')}
+          </div>
         )
       )}
 
       {section === 'alive' && (
-        aliveIps.length > 0 ? (() => {
-          const { rows, page, totalPages } = paginate(aliveIps, pages.alive);
-          return tableFrame(
+        filteredAliveIps.length > 0 ? (() => {
+          const { rows, page, totalPages } = paginate(filteredAliveIps, pages.alive);
+          return (
             <>
-              <p className="mb-2 text-xs text-muted-foreground">{t('task_detail.alive_ip_only_hint')}</p>
-              <div className="space-y-1">
-                {rows.map((ip) => (
-                  <div key={ip} className="rounded-md border border-border/60 bg-background/50 px-3 py-2 font-mono text-sm text-foreground">
-                    {ip}
+              <div className="mb-2 flex flex-col md:flex-row md:items-center gap-2">
+                <div className="relative flex-1">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <input
+                    value={aliveSearch}
+                    onChange={(e) => setAliveSearch(e.target.value)}
+                    placeholder={t('task_detail.alive_search_placeholder', { defaultValue: 'Search alive IPs' })}
+                    className="h-9 w-full rounded-md border border-input bg-background pl-9 pr-3 text-sm text-foreground"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setAliveSortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'))}
+                    className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background/60 px-2.5 py-1.5 text-xs text-foreground hover:bg-accent/60"
+                  >
+                    <ArrowUpDown size={13} />
+                    <span>{aliveSortDir === 'asc' ? t('task_detail.sort_asc', { defaultValue: 'Asc' }) : t('task_detail.sort_desc', { defaultValue: 'Desc' })}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCopyAliveIps}
+                    className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background/60 px-2.5 py-1.5 text-xs text-foreground hover:bg-accent/60"
+                  >
+                    <Copy size={13} />
+                    <span>{t('common.copy', { defaultValue: 'Copy' })}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleExportAliveIps}
+                    className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background/60 px-2.5 py-1.5 text-xs text-foreground hover:bg-accent/60"
+                  >
+                    <Download size={13} />
+                    <span>{t('common.export', { defaultValue: 'Export' })}</span>
+                  </button>
+                </div>
+              </div>
+              <div className="rounded-md border border-border/60 bg-background/35 overflow-hidden">
+                {rows.map((ip, idx) => (
+                  <div key={ip} className={`px-3 py-2 ${idx < rows.length - 1 ? 'border-b border-border/50' : ''}`}>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-mono text-sm text-foreground">{ip}</span>
+                      <Link
+                        to={`/task/${task.id}/results/ports?q=${encodeURIComponent(ip)}`}
+                        className="text-xs text-primary hover:text-primary/80"
+                      >
+                        {t('task_detail.view_ports', { defaultValue: 'View ports' })}
+                      </Link>
+                    </div>
                   </div>
                 ))}
               </div>
               {pager('alive', page, totalPages)}
-            </>,
+            </>
           );
         })() : (
-          <div className="text-sm text-muted-foreground">{t('task_detail.no_alive_hosts')}</div>
+          <div className="text-sm text-muted-foreground">
+            {aliveIps.length > 0 ? t('tasks_overview.no_filter_match') : t('task_detail.no_alive_hosts')}
+          </div>
         )
       )}
 

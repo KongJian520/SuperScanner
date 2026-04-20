@@ -4,16 +4,16 @@ import {BackendConfig, ServerInfo, Task, TaskStatus} from '../types';
 export type ApiResult<T> = { ok: true; data: T } | { ok: false, error: string };
 
 const textErr = (e: unknown) => {
-    try {
-        // @ts-ignore
-        return String(e?.message ?? e ?? 'Unknown error');
-    } catch {
-        return 'Unknown error';
-    }
+    if (e instanceof Error) return e.message;
+    return String(e ?? 'Unknown error');
 };
 
 const parseTs = (v: any): number | undefined =>
-    typeof v === 'string' ? Date.parse(v) : typeof v === 'number' ? v : undefined;
+    typeof v === 'string'
+        ? (Number.isFinite(Date.parse(v)) ? Date.parse(v) : undefined)
+        : typeof v === 'number'
+            ? (Number.isFinite(v) ? v : undefined)
+            : undefined;
 
 /** 统一将后端 DTO（camelCase）映射为前端 Task */
 function mapRawToTask(raw: any): Task {
@@ -54,15 +54,15 @@ export async function addBackendWithProbe(payload: {
     address: string;
     description?: string | null;
     useTls: boolean
-}): Promise<ApiResult<BackendConfig | null>> {
+}): Promise<ApiResult<BackendConfig>> {
     try {
-        await invoke('add_backend_with_probe', {
+        const data = await invoke<BackendConfig>('add_backend_with_probe', {
             name: payload.name,
             address: payload.address,
             description: payload.description ?? null,
             use_tls: payload.useTls,
         });
-        return {ok: true, data: null};
+        return {ok: true, data};
     } catch (e) {
         return {ok: false, error: textErr(e)};
     }

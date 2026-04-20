@@ -71,8 +71,9 @@ const TaskResultsTable: React.FC<TaskResultsTableProps> = ({ results }) => {
   };
 
   const stateColor = (state: string) => {
-    if (state === 'open') return 'text-green-500';
-    if (state === 'closed') return 'text-red-400';
+    const normalized = state.toLowerCase();
+    if (normalized === 'open') return 'text-green-500';
+    if (normalized === 'closed') return 'text-red-400';
     return 'text-muted-foreground';
   };
 

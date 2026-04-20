@@ -11,6 +11,7 @@ import AutoSizer from 'react-virtualized-auto-sizer';
 import { useTranslation } from 'react-i18next';
 import { microInteraction, routeLite, stateTransition } from '../lib/motion';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { pickEffectiveBackendId } from '../lib/backend-selection';
 
 const rowVariants = {
   hidden: { opacity: 0, y: 14, scale: 0.995, filter: 'blur(5px)' },
@@ -45,7 +46,7 @@ export const TasksOverview: React.FC = () => {
     return () => mediaQuery.removeEventListener('change', onChange);
   }, []);
 
-  const effectiveBackendId = activeBackendId ?? defaultBackendId ?? backends?.find((b) => b.address)?.id ?? null;
+  const effectiveBackendId = pickEffectiveBackendId(backends, activeBackendId, defaultBackendId);
   const { data: tasks = [], isLoading, error } = useTasks(effectiveBackendId);
   const { mutate: deleteTask } = useDeleteTask();
 
@@ -71,7 +72,7 @@ export const TasksOverview: React.FC = () => {
 
   const handleSelectTask = (id: string) => {
     setActiveTaskId(id);
-    setActiveBackendId(null);
+    setActiveBackendId(effectiveBackendId);
     navigate(`/task/${id}`);
   };
 

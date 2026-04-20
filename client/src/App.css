@@ -14,6 +14,12 @@
   scroll-behavior: auto !important;
 }
 
+.motion-reduced-body,
+.motion-reduced-body::before {
+  animation: none !important;
+  background-attachment: initial !important;
+}
+
 @custom-variant dark (&:is(.dark *), .dark &);
 
 @theme inline {

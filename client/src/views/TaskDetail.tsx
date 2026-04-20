@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Task, TaskStatus } from '../types';
 import { toast } from 'sonner';
-import { AlertOctagon, Check, ChevronDown, Clock, Download, Play, Settings2, Square, X } from 'lucide-react';
+import { AlertOctagon, Check, CheckCircle2, ChevronDown, Clock, Download, Play, Settings2, Square, X } from 'lucide-react';
 import { useStartTask, useStopTask, useBackends } from '../hooks/use-scanner-api';
 import * as api from '../lib/api';
 
@@ -230,6 +230,12 @@ export const TaskDetail: React.FC<TaskDetailProps> = ({ task, activeSection = 'a
       activeClass: 'from-rose-500/75 to-red-500/75 border-rose-300/40',
     },
   ];
+  const hasExitCode = task.exitCode !== undefined;
+  const hasTaskError = Boolean(task.errorMessage) || (typeof task.exitCode === 'number' && task.exitCode !== 0);
+  const exitBannerClass = hasTaskError
+    ? 'bg-destructive/10 border-destructive/20'
+    : 'bg-emerald-500/10 border-emerald-500/25';
+  const exitCodeClass = hasTaskError ? 'text-destructive' : 'text-emerald-300';
 
   return (
     <div className="h-full flex flex-col">
@@ -353,10 +359,14 @@ export const TaskDetail: React.FC<TaskDetailProps> = ({ task, activeSection = 'a
        </div>
 
       {(task.exitCode !== undefined || task.errorMessage) && (
-        <div className="px-4 py-2 bg-destructive/10 border-b border-destructive/20 flex items-start gap-2 text-sm">
-          <AlertOctagon size={14} className="mt-0.5 text-destructive flex-shrink-0" />
+        <div className={`px-4 py-2 border-b flex items-start gap-2 text-sm ${exitBannerClass}`}>
+          {hasTaskError ? (
+            <AlertOctagon size={14} className="mt-0.5 text-destructive flex-shrink-0" />
+          ) : (
+            <CheckCircle2 size={14} className="mt-0.5 text-emerald-300 flex-shrink-0" />
+          )}
           <div>
-            {task.exitCode !== undefined && <span className="text-muted-foreground text-xs mr-2">{t('task_detail.exit_code', { code: task.exitCode })}</span>}
+            {hasExitCode && <span className={`text-xs mr-2 ${exitCodeClass}`}>{t('task_detail.exit_code', { code: task.exitCode })}</span>}
             {task.errorMessage && <span className="text-destructive font-mono text-xs">{task.errorMessage}</span>}
           </div>
         </div>

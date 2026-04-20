@@ -15,6 +15,12 @@ const validateAddress = (addr: string) => {
     return hostPortPattern.test(v);
 };
 
+const validatePort = (port: string) => {
+    if (!/^\d{1,5}$/.test(port.trim())) return false;
+    const num = Number(port.trim());
+    return Number.isInteger(num) && num >= 1 && num <= 65535;
+};
+
 type ConnectionMode = 'hostPort' | 'url';
 
 const NewBackendDialog: React.FC<{ open: boolean; onCancel: () => void }> = ({ open, onCancel }) => {
@@ -55,16 +61,17 @@ const NewBackendDialog: React.FC<{ open: boolean; onCancel: () => void }> = ({ o
     }, [address, connectionMode]);
 
     const nameError = touched.name && name.trim().length === 0 ? t('new_backend.name_required') : '';
+    const hostPortValid = ip.trim().length > 0 && validatePort(port);
     const addressError = touched.address && !(
         connectionMode === 'url'
             ? validateAddress(address)
-            : (ip.trim().length > 0 && /^\d{1,5}$/.test(port))
+            : hostPortValid
     ) ? t('new_backend.address_invalid') : '';
 
     const isValid = name.trim().length > 0 && (
         connectionMode === 'url'
             ? validateAddress(address)
-            : (ip.trim().length > 0 && port.trim().length > 0)
+            : hostPortValid
     );
 
     const handleSubmit = async (e?: React.FormEvent) => {

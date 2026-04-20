@@ -52,6 +52,7 @@ fn workflow_from_proto(wf: Option<tasks_proto::Workflow>) -> WorkflowDto {
 
 /// Convert a Task proto message into a TaskDto used by the frontend.
 pub fn task_from_proto(p: tasks_proto::Task) -> TaskDto {
+    let is_terminal = matches!(p.status, 3 | 4 | 5);
     TaskDto {
         id: p.id,
         name: p.name,
@@ -62,8 +63,11 @@ pub fn task_from_proto(p: tasks_proto::Task) -> TaskDto {
         },
         targets: if p.targets.is_empty() { None } else { Some(p.targets) },
         status: p.status,
+        exit_code: if is_terminal || p.exit_code != 0 { Some(p.exit_code) } else { None },
+        error_message: if p.error_message.is_empty() { None } else { Some(p.error_message) },
         progress: p.progress,
         created_at: ts_to_rfc3339(p.created_at),
+        updated_at: ts_to_rfc3339(p.updated_at),
         started_at: ts_to_rfc3339(p.started_at),
         finished_at: ts_to_rfc3339(p.finished_at),
         workflow: workflow_from_proto(p.workflow),

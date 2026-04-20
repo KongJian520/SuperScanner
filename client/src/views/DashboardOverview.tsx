@@ -6,12 +6,13 @@ import { useBackends, useTasks } from '../hooks/use-scanner-api';
 import { useAppStore } from '../lib/store';
 import { TaskStatus } from '../types';
 import { routeLite } from '../lib/motion';
+import { pickEffectiveBackendId } from '../lib/backend-selection';
 
 export const DashboardOverview: React.FC = () => {
   const { t } = useTranslation();
   const { activeBackendId, defaultBackendId } = useAppStore();
   const { data: backends } = useBackends();
-  const effectiveBackendId = activeBackendId ?? defaultBackendId ?? backends?.find((b) => b.address)?.id ?? null;
+  const effectiveBackendId = pickEffectiveBackendId(backends, activeBackendId, defaultBackendId);
   const { data: tasks = [] } = useTasks(effectiveBackendId);
   const hasBackend = Boolean(effectiveBackendId);
 
