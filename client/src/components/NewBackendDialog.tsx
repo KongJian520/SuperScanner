@@ -15,6 +15,8 @@ const validateAddress = (addr: string) => {
     return hostPortPattern.test(v);
 };
 
+type ConnectionMode = 'hostPort' | 'url';
+
 const NewBackendDialog: React.FC<{ open: boolean; onCancel: () => void }> = ({ open, onCancel }) => {
     const { t } = useTranslation();
     const { mutateAsync: addBackend, isPending: isSubmitting, error: submitError } = useAddBackend();
@@ -24,6 +26,7 @@ const NewBackendDialog: React.FC<{ open: boolean; onCancel: () => void }> = ({ o
     const [ip, setIp] = useState('');
     const [port, setPort] = useState('');
     const [address, setAddress] = useState('');
+    const [connectionMode, setConnectionMode] = useState<ConnectionMode>('hostPort');
     const [description, setDescription] = useState('');
     const [useTls, setUseTls] = useState(false);
     const [touched, setTouched] = useState({ name: false, address: false });
@@ -35,6 +38,7 @@ const NewBackendDialog: React.FC<{ open: boolean; onCancel: () => void }> = ({ o
             setIp('');
             setPort('');
             setAddress('');
+            setConnectionMode('hostPort');
             setDescription('');
             setUseTls(false);
             setTouched({ name: false, address: false });
@@ -43,24 +47,48 @@ const NewBackendDialog: React.FC<{ open: boolean; onCancel: () => void }> = ({ o
         }
     }, [open]);
 
-    const nameError = touched.name && name.trim().length === 0 ? t('new_backend.name_required') : '';
-    const addressError = touched.address && !(validateAddress(address) || (ip.trim() && /^\d{1,5}$/.test(port))) ? t('new_backend.address_invalid') : '';
+    useEffect(() => {
+        if (connectionMode !== 'url') return;
+        const trimmed = address.trim().toLowerCase();
+        if (trimmed.startsWith('https://')) setUseTls(true);
+        else if (trimmed.startsWith('http://')) setUseTls(false);
+    }, [address, connectionMode]);
 
-    const isValid = name.trim().length > 0 && (validateAddress(address) || (ip.trim().length > 0 && port.trim().length > 0));
+    const nameError = touched.name && name.trim().length === 0 ? t('new_backend.name_required') : '';
+    const addressError = touched.address && !(
+        connectionMode === 'url'
+            ? validateAddress(address)
+            : (ip.trim().length > 0 && /^\d{1,5}$/.test(port))
+    ) ? t('new_backend.address_invalid') : '';
+
+    const isValid = name.trim().length > 0 && (
+        connectionMode === 'url'
+            ? validateAddress(address)
+            : (ip.trim().length > 0 && port.trim().length > 0)
+    );
 
     const handleSubmit = async (e?: React.FormEvent) => {
         e?.preventDefault();
         setTouched({ name: true, address: true });
         if (!isValid) return;
         
-        let finalAddress = address.trim();
-        if (!finalAddress) {
+        let finalAddress = '';
+        let finalUseTls = useTls;
+        if (connectionMode === 'url') {
+            finalAddress = address.trim();
+            if (!/^https?:\/\//i.test(finalAddress)) {
+                const scheme = useTls ? 'https' : 'http';
+                finalAddress = `${scheme}://${finalAddress}`;
+            }
+            finalUseTls = /^https:\/\//i.test(finalAddress);
+        } else {
             const scheme = useTls ? 'https' : 'http';
             finalAddress = `${scheme}://${ip.trim()}:${port.trim()}`;
+            finalUseTls = useTls;
         }
         
         try {
-            const res = await addBackend({ name: name.trim(), address: finalAddress, description: description.trim() || null, useTls });
+            const res = await addBackend({ name: name.trim(), address: finalAddress, description: description.trim() || null, useTls: finalUseTls });
             if (res?.id) navigate(`/server/${res.id}`);
             else navigate('/servers');
         } catch (e) {
@@ -101,37 +129,59 @@ const NewBackendDialog: React.FC<{ open: boolean; onCancel: () => void }> = ({ o
 
                     <div className="grid gap-2">
                         <Label>{t('new_backend.connection_details')}</Label>
-                        <div className="grid grid-cols-5 gap-2">
-                            <Input
-                                className="col-span-3"
-                                value={ip}
-                                onChange={e => setIp(e.target.value)}
-                                placeholder={t('new_backend.ip_placeholder')}
-                                disabled={isSubmitting}
-                            />
-                            <Input
-                                className="col-span-2"
-                                value={port}
-                                onChange={e => setPort(e.target.value)}
-                                placeholder={t('new_backend.port_placeholder')}
-                                disabled={isSubmitting}
-                            />
+                        <div className="grid grid-cols-2 gap-2 rounded-md bg-muted/40 p-1">
+                            <Button
+                                type="button"
+                                variant={connectionMode === 'hostPort' ? 'default' : 'ghost'}
+                                size="sm"
+                                className="h-8"
+                                onClick={() => {
+                                    setConnectionMode('hostPort');
+                                    setTouched(t => ({ ...t, address: false }));
+                                }}
+                            >
+                                {t('new_backend.mode_host_port')}
+                            </Button>
+                            <Button
+                                type="button"
+                                variant={connectionMode === 'url' ? 'default' : 'ghost'}
+                                size="sm"
+                                className="h-8"
+                                onClick={() => {
+                                    setConnectionMode('url');
+                                    setTouched(t => ({ ...t, address: false }));
+                                }}
+                            >
+                                {t('new_backend.mode_full_url')}
+                            </Button>
                         </div>
-                        <div className="relative">
-                            <div className="absolute inset-0 flex items-center">
-                                <span className="w-full border-t" />
+                        {connectionMode === 'hostPort' ? (
+                            <div className="grid grid-cols-5 gap-2">
+                                <Input
+                                    className="col-span-3"
+                                    value={ip}
+                                    onChange={e => setIp(e.target.value)}
+                                    placeholder={t('new_backend.ip_placeholder')}
+                                    disabled={isSubmitting}
+                                />
+                                <Input
+                                    className="col-span-2"
+                                    value={port}
+                                    onChange={e => setPort(e.target.value)}
+                                    placeholder={t('new_backend.port_placeholder')}
+                                    disabled={isSubmitting}
+                                />
                             </div>
-                            <div className="relative flex justify-center text-xs uppercase">
-                                <span className="bg-background px-2 text-muted-foreground">{t('new_backend.or_full_url')}</span>
-                            </div>
-                        </div>
-                        <Input
-                            value={address}
-                            onChange={e => setAddress(e.target.value)}
-                            placeholder={t('new_backend.url_placeholder')}
-                            disabled={isSubmitting}
-                            className={addressError ? "border-destructive focus-visible:ring-destructive" : ""}
-                        />
+                        ) : (
+                            <Input
+                                value={address}
+                                onChange={e => setAddress(e.target.value)}
+                                onBlur={() => setTouched(t => ({ ...t, address: true }))}
+                                placeholder={t('new_backend.url_placeholder')}
+                                disabled={isSubmitting}
+                                className={addressError ? "border-destructive focus-visible:ring-destructive" : ""}
+                            />
+                        )}
                         <div
                             className={`grid transition-all duration-200 ease-out ${addressError ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}
                             aria-live="polite"
@@ -158,7 +208,7 @@ const NewBackendDialog: React.FC<{ open: boolean; onCancel: () => void }> = ({ o
                             checked={useTls}
                             onChange={e => setUseTls(e.target.checked)}
                             className="h-4 w-4 rounded border-primary text-primary focus:ring-primary"
-                            disabled={isSubmitting}
+                            disabled={isSubmitting || (connectionMode === 'url' && /^https?:\/\//i.test(address.trim()))}
                         />
                         <div className="flex-1 space-y-1">
                             <Label htmlFor="tls" className="cursor-pointer flex items-center gap-2">
