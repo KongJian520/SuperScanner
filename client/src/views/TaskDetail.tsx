@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Task, TaskStatus } from '../types';
 import { toast } from 'sonner';
-import { AlertOctagon, Check, Clock, Download, Play, Square, X } from 'lucide-react';
+import { AlertOctagon, Check, ChevronDown, Clock, Download, Play, Settings2, Square, X } from 'lucide-react';
 import { useStartTask, useStopTask, useBackends } from '../hooks/use-scanner-api';
 import * as api from '../lib/api';
 
@@ -71,6 +71,8 @@ export const TaskDetail: React.FC<TaskDetailProps> = ({ task, activeSection = 'a
     restart: 'idle',
   });
   const resetTimers = useRef<Partial<Record<ActionKey, number>>>({});
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
+  const exportMenuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     return () => {
@@ -79,6 +81,17 @@ export const TaskDetail: React.FC<TaskDetailProps> = ({ task, activeSection = 'a
       });
     };
   }, []);
+
+  useEffect(() => {
+    if (!exportMenuOpen) return;
+    const handleOutsideClick = (event: MouseEvent) => {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(event.target as Node)) {
+        setExportMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, [exportMenuOpen]);
 
   const setActionFeedback = (action: ActionKey, state: ActionFeedback) => {
     const timerId = resetTimers.current[action];
@@ -175,6 +188,7 @@ export const TaskDetail: React.FC<TaskDetailProps> = ({ task, activeSection = 'a
       } else {
         downloadTextFile(JSON.stringify(exportRows, null, 2), `${filePrefix}.json`, 'application/json;charset=utf-8;');
       }
+      setExportMenuOpen(false);
       toast.success(t('task_detail.export_success', { format: format.toUpperCase() }));
     } catch {
       toast.error(t('task_detail.export_failed'));
@@ -226,9 +240,45 @@ export const TaskDetail: React.FC<TaskDetailProps> = ({ task, activeSection = 'a
         />
         <div className="absolute inset-0 pointer-events-none opacity-20 bg-[radial-gradient(circle_at_20%_20%,rgba(59,130,246,0.35),transparent_55%)]" />
         <div className="relative z-10 min-w-0 w-full">
-          <div className="flex items-center gap-3 mb-1">
-            <h2 className="text-lg sm:text-xl font-bold text-foreground truncate">{task.name}</h2>
-            <TaskStatusBadge status={task.status} />
+          <div className="flex items-center justify-between gap-3 mb-1">
+            <div className="flex items-center gap-3 min-w-0">
+              <h2 className="text-lg sm:text-xl font-bold text-foreground truncate">{task.name}</h2>
+              <TaskStatusBadge status={task.status} />
+            </div>
+            <div className="relative shrink-0" ref={exportMenuRef}>
+              <motion.button
+                type="button"
+                disabled={results.length === 0}
+                onClick={() => setExportMenuOpen((prev) => !prev)}
+                whileTap={{ scale: microInteraction.actionButtonPress.scale }}
+                transition={{ duration: microInteraction.actionButtonPress.duration, ease: microInteraction.actionButtonPress.ease }}
+                className="inline-flex items-center gap-2 rounded-md border border-border bg-background/80 px-3 py-1.5 text-sm font-semibold text-foreground transition-colors hover:bg-accent/70 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap shrink-0"
+              >
+                <Settings2 size={14} />
+                <span>{t('task_detail.export_report')}</span>
+                <ChevronDown size={14} className={`transition-transform ${exportMenuOpen ? 'rotate-180' : ''}`} />
+              </motion.button>
+              {exportMenuOpen && (
+                <div className="absolute right-0 top-[calc(100%+0.4rem)] z-30 min-w-[170px] overflow-hidden rounded-md border border-border bg-popover shadow-lg">
+                  <button
+                    type="button"
+                    onClick={() => handleExport('csv')}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-popover-foreground transition-colors hover:bg-accent/70"
+                  >
+                    <Download size={14} />
+                    <span>{t('task_detail.export_csv')}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleExport('json')}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-popover-foreground transition-colors hover:bg-accent/70"
+                  >
+                    <Download size={14} />
+                    <span>{t('task_detail.export_json')}</span>
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
           <p className="min-h-5 text-sm text-muted-foreground italic truncate">
             {task.description ? `"${task.description}"` : t('common.na')}
@@ -250,9 +300,9 @@ export const TaskDetail: React.FC<TaskDetailProps> = ({ task, activeSection = 'a
               onClick={handleStart}
               disabled={isToggling}
               whileTap={{ scale: microInteraction.actionButtonPress.scale }}
-              transition={{ duration: microInteraction.actionButtonPress.duration, ease: microInteraction.actionButtonPress.ease }}
-              className={`flex items-center gap-2 px-3 py-1.5 text-sm font-semibold rounded-md border transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
-                feedback.start === 'success'
+               transition={{ duration: microInteraction.actionButtonPress.duration, ease: microInteraction.actionButtonPress.ease }}
+               className={`flex items-center gap-2 px-3 py-1.5 text-sm font-semibold rounded-md border transition-all disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap shrink-0 ${
+                 feedback.start === 'success'
                   ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40'
                   : feedback.start === 'error'
                     ? 'bg-destructive/15 text-destructive border-destructive/40'
@@ -268,9 +318,9 @@ export const TaskDetail: React.FC<TaskDetailProps> = ({ task, activeSection = 'a
               onClick={handleStop}
               disabled={isToggling}
               whileTap={{ scale: microInteraction.actionButtonPress.scale }}
-              transition={{ duration: microInteraction.actionButtonPress.duration, ease: microInteraction.actionButtonPress.ease }}
-              className={`flex items-center gap-2 px-3 py-1.5 text-sm font-semibold rounded-md border transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
-                feedback.stop === 'success'
+               transition={{ duration: microInteraction.actionButtonPress.duration, ease: microInteraction.actionButtonPress.ease }}
+               className={`flex items-center gap-2 px-3 py-1.5 text-sm font-semibold rounded-md border transition-all disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap shrink-0 ${
+                 feedback.stop === 'success'
                   ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40'
                   : feedback.stop === 'error'
                     ? 'bg-destructive/15 text-destructive border-destructive/40'
@@ -286,9 +336,9 @@ export const TaskDetail: React.FC<TaskDetailProps> = ({ task, activeSection = 'a
               onClick={handleRestart}
               disabled={isToggling}
               whileTap={{ scale: microInteraction.actionButtonPress.scale }}
-              transition={{ duration: microInteraction.actionButtonPress.duration, ease: microInteraction.actionButtonPress.ease }}
-              className={`flex items-center gap-2 px-3 py-1.5 text-sm font-semibold rounded-md border transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
-                feedback.restart === 'success'
+               transition={{ duration: microInteraction.actionButtonPress.duration, ease: microInteraction.actionButtonPress.ease }}
+               className={`flex items-center gap-2 px-3 py-1.5 text-sm font-semibold rounded-md border transition-all disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap shrink-0 ${
+                 feedback.restart === 'success'
                   ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40'
                   : feedback.restart === 'error'
                     ? 'bg-destructive/15 text-destructive border-destructive/40'
@@ -299,28 +349,8 @@ export const TaskDetail: React.FC<TaskDetailProps> = ({ task, activeSection = 'a
               <span>{t('task_detail.restart')}</span>
             </motion.button>
           )}
-          <motion.button
-            onClick={() => handleExport('csv')}
-            disabled={results.length === 0}
-            whileTap={{ scale: microInteraction.actionButtonPress.scale }}
-            transition={{ duration: microInteraction.actionButtonPress.duration, ease: microInteraction.actionButtonPress.ease }}
-            className="flex items-center gap-2 px-3 py-1.5 text-sm font-semibold rounded-md border transition-all disabled:opacity-50 disabled:cursor-not-allowed bg-background/80 text-foreground border-border hover:bg-accent/70"
-          >
-            <Download size={14} />
-            <span>{t('task_detail.export_csv')}</span>
-          </motion.button>
-          <motion.button
-            onClick={() => handleExport('json')}
-            disabled={results.length === 0}
-            whileTap={{ scale: microInteraction.actionButtonPress.scale }}
-            transition={{ duration: microInteraction.actionButtonPress.duration, ease: microInteraction.actionButtonPress.ease }}
-            className="flex items-center gap-2 px-3 py-1.5 text-sm font-semibold rounded-md border transition-all disabled:opacity-50 disabled:cursor-not-allowed bg-background/80 text-foreground border-border hover:bg-accent/70"
-          >
-            <Download size={14} />
-            <span>{t('task_detail.export_json')}</span>
-          </motion.button>
-        </div>
-      </div>
+         </div>
+       </div>
 
       {(task.exitCode !== undefined || task.errorMessage) && (
         <div className="px-4 py-2 bg-destructive/10 border-b border-destructive/20 flex items-start gap-2 text-sm">
@@ -332,25 +362,25 @@ export const TaskDetail: React.FC<TaskDetailProps> = ({ task, activeSection = 'a
         </div>
       )}
 
-      <div className="border-b border-border bg-card/55 backdrop-blur-sm px-3 sm:px-4 md:px-6 py-3">
-        <div className="grid grid-cols-2 gap-2">
+      <div className="border-b border-border bg-card/55 backdrop-blur-sm px-3 sm:px-4 md:px-6 py-2">
+        <div className="grid grid-cols-4 gap-1.5 sm:gap-2">
           {tabs.map((tab) => {
             const isActive = activeSection === tab.section;
             return (
               <Link
                 key={tab.section}
                 to={`/task/${task.id}/results/${tab.section}`}
-                className={`group rounded-lg border px-3 py-2 transition-all h-[84px] ${
+                className={`group rounded-lg border px-2 py-1.5 transition-all h-[60px] sm:h-[66px] ${
                   isActive
                     ? `bg-gradient-to-r text-white shadow-[0_12px_26px_-18px_rgba(59,130,246,0.9)] ${tab.activeClass}`
                     : 'border-border/70 bg-background/60 text-muted-foreground hover:text-foreground hover:border-primary/30 hover:bg-accent/50'
                 }`}
               >
                 <div className="h-full flex flex-col items-center justify-center gap-1">
-                  <span className={`text-lg sm:text-xl font-black tabular-nums leading-none ${isActive ? 'text-white' : 'text-foreground'}`}>
+                  <span className={`text-base sm:text-lg font-black tabular-nums leading-none ${isActive ? 'text-white' : 'text-foreground'}`}>
                     {tab.count}
                   </span>
-                  <p className={`text-xs font-semibold tracking-wide uppercase truncate ${isActive ? 'text-white/90' : 'text-muted-foreground group-hover:text-foreground/80'}`}>
+                  <p className={`text-[11px] sm:text-xs font-semibold tracking-wide uppercase truncate ${isActive ? 'text-white/90' : 'text-muted-foreground group-hover:text-foreground/80'}`}>
                     {tab.title}
                   </p>
                 </div>
@@ -361,13 +391,15 @@ export const TaskDetail: React.FC<TaskDetailProps> = ({ task, activeSection = 'a
       </div>
 
       <div className="flex-1 min-h-0 p-3 sm:p-4 md:p-6">
-        <div className="h-full rounded-xl border border-border bg-card/60 backdrop-blur-sm overflow-hidden">
-          {activeSection === 'ports' ? (
+        {activeSection === 'ports' ? (
+          <div className="h-full rounded-xl border border-border bg-card/60 backdrop-blur-sm overflow-hidden">
             <TaskPortsDetail task={task} embedded />
-          ) : (
+          </div>
+        ) : (
+          <div className="h-full overflow-hidden">
             <TaskResultPlaceholderDetail task={task} section={activeSection} embedded />
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );

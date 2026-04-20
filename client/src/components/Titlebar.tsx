@@ -1,8 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Minus, Square, X } from 'lucide-react';
+import { Activity, Minus, Server, Square, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { isMac, isWindows, isTauri } from '../lib/platform';
+import { useBackends, useTasks } from '../hooks/use-scanner-api';
+import { useAppStore } from '../lib/store';
+import { TaskStatus } from '../types';
 
 const getWindow = () => {
   try {
@@ -90,6 +93,11 @@ export const Titlebar: React.FC = () => {
   const mod = isMac ? '⌘' : 'Ctrl+';
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const menuBarRef = useRef<HTMLDivElement>(null);
+  const { activeBackendId, defaultBackendId } = useAppStore();
+  const { data: backends = [] } = useBackends();
+  const effectiveBackendId = activeBackendId ?? defaultBackendId ?? backends.find((b) => b.address)?.id ?? null;
+  const { data: tasks = [] } = useTasks(effectiveBackendId);
+  const runningTasks = tasks.filter((task) => task.status === TaskStatus.RUNNING).length;
 
   // 点击菜单栏外部时关闭
   useEffect(() => {
@@ -135,8 +143,29 @@ export const Titlebar: React.FC = () => {
           className="w-full"
           style={{ paddingTop: 'env(safe-area-inset-top)' }}
         >
-          <div className="h-10 px-3 flex items-center">
-            <span className="text-[11px] font-semibold text-foreground/80 tracking-[0.12em] uppercase">{t('app.name')}</span>
+          <div className="h-10 px-3 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(74,222,128,0.75)]" />
+              <span className="text-[11px] font-semibold text-foreground/80 tracking-[0.12em] uppercase truncate">{t('app.name')}</span>
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <span
+                className="inline-flex h-7 items-center gap-1.5 rounded-md border border-border/70 bg-background/50 px-2 text-[10px] text-muted-foreground"
+                title={t('titlebar.mobile_running_tasks')}
+                aria-label={t('titlebar.mobile_running_tasks')}
+              >
+                <Activity size={12} className={runningTasks > 0 ? 'text-blue-400 animate-pulse' : 'text-muted-foreground'} />
+                <span className="font-medium text-foreground/90">{runningTasks}</span>
+              </span>
+              <span
+                className="inline-flex h-7 items-center gap-1.5 rounded-md border border-border/70 bg-background/50 px-2 text-[10px] text-muted-foreground"
+                title={t('titlebar.mobile_connected_backends')}
+                aria-label={t('titlebar.mobile_connected_backends')}
+              >
+                <Server size={12} className="text-cyan-400" />
+                <span className="font-medium text-foreground/90">{backends.length}</span>
+              </span>
+            </div>
           </div>
         </div>
       </div>

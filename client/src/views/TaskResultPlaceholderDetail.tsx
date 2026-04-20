@@ -3,8 +3,6 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import {
   ArrowLeft,
-  ChevronDown,
-  ChevronUp,
   Database,
   Folder,
   Globe,
@@ -130,8 +128,6 @@ export const TaskResultPlaceholderDetail: React.FC<TaskResultPlaceholderDetailPr
   const aliveIps = Array.from(new Set(openResults.map((r) => r.ip).filter(Boolean))).sort();
   const hostProfiles = buildHostProfiles(task);
   const hasPocStep = task.workflow?.steps?.some((step) => step.type === ScanType.Poc) ?? false;
-  const [expandedHosts, setExpandedHosts] = React.useState<Record<string, boolean>>({});
-  const [assetsViewMode, setAssetsViewMode] = React.useState<'cards' | 'details'>('cards');
   const [selectedHost, setSelectedHost] = React.useState<HostProfile | null>(null);
   const [pages, setPages] = React.useState<Record<'assets' | 'alive' | 'vulns', number>>({
     assets: 1,
@@ -222,131 +218,30 @@ export const TaskResultPlaceholderDetail: React.FC<TaskResultPlaceholderDetailPr
           const { rows, page, totalPages } = paginate(hostProfiles, pages.assets);
           return (
             <>
-              <div className="mb-2 flex items-center gap-2">
-                <button
-                  type="button"
-                  className={`px-2.5 py-1 rounded-md text-xs border ${assetsViewMode === 'cards' ? 'bg-primary/15 border-primary/40 text-primary' : 'bg-background/70 border-border text-muted-foreground'}`}
-                  onClick={() => setAssetsViewMode('cards')}
-                >
-                  {t('task_detail.assets_view_cards')}
-                </button>
-                <button
-                  type="button"
-                  className={`px-2.5 py-1 rounded-md text-xs border ${assetsViewMode === 'details' ? 'bg-primary/15 border-primary/40 text-primary' : 'bg-background/70 border-border text-muted-foreground'}`}
-                  onClick={() => setAssetsViewMode('details')}
-                >
-                  {t('task_detail.assets_view_details')}
-                </button>
+              <div className="grid grid-cols-1 min-[520px]:grid-cols-2 xl:grid-cols-3 gap-3">
+                {rows.map((host) => {
+                  const HostIcon = pickHostIcon(host.roles);
+                  return (
+                    <button
+                      key={host.ip}
+                      type="button"
+                      className="w-full rounded-lg border border-border/70 bg-card/70 p-3 text-left hover:bg-accent/50 transition-colors"
+                      onClick={() => setSelectedHost(host)}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="inline-flex items-center justify-center rounded-md border border-primary/30 bg-primary/10 p-1.5 text-primary">
+                          <HostIcon size={16} />
+                        </span>
+                        <p className="font-mono text-sm font-semibold text-foreground truncate">{host.ip}</p>
+                      </div>
+                      <p className="mt-2 text-xs text-muted-foreground truncate">{host.roles.join(', ')}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {t('task_detail.host_profile_open_ports')}: {host.openPorts.length} · {t('task_detail.label_services')}: {host.services.length}
+                      </p>
+                    </button>
+                  );
+                })}
               </div>
-
-              {assetsViewMode === 'cards' ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-                  {rows.map((host) => {
-                    const HostIcon = pickHostIcon(host.roles);
-                    return (
-                      <button
-                        key={host.ip}
-                        type="button"
-                        className="rounded-lg border border-border/70 bg-card/70 p-3 text-left hover:bg-accent/50 transition-colors"
-                        onClick={() => setSelectedHost(host)}
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className="inline-flex items-center justify-center rounded-md border border-primary/30 bg-primary/10 p-1.5 text-primary">
-                            <HostIcon size={16} />
-                          </span>
-                          <p className="font-mono text-sm font-semibold text-foreground truncate">{host.ip}</p>
-                        </div>
-                        <p className="mt-2 text-xs text-muted-foreground truncate">{host.roles.join(', ')}</p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          {t('task_detail.host_profile_open_ports')}: {host.openPorts.length} · {t('task_detail.label_services')}: {host.services.length}
-                        </p>
-                      </button>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
-                  {rows.map((host) => (
-                    <div key={host.ip} className="rounded-lg border border-border/70 bg-card/70 p-3 sm:p-4 space-y-3">
-                      {(() => {
-                        const expanded = !!expandedHosts[host.ip];
-                        const HostIcon = pickHostIcon(host.roles);
-                        return (
-                          <>
-                            <button
-                              type="button"
-                              className="w-full flex items-center justify-between gap-3 text-left rounded-md border border-border/60 bg-background/40 px-3 py-2 hover:bg-accent/50 transition-colors"
-                              onClick={() => setExpandedHosts((prev) => ({ ...prev, [host.ip]: !expanded }))}
-                            >
-                              <div className="flex items-center gap-2 min-w-0">
-                                <span className="inline-flex items-center justify-center rounded-md border border-primary/30 bg-primary/10 p-1.5 text-primary">
-                                  <HostIcon size={16} />
-                                </span>
-                                <div className="min-w-0">
-                                  <p className="font-mono text-sm font-semibold text-foreground truncate">{host.ip}</p>
-                                  <p className="text-xs text-muted-foreground truncate">
-                                    {host.roles.join(', ')} · {host.services.slice(0, 2).join(', ') || t('common.na')}
-                                  </p>
-                                </div>
-                              </div>
-                              <span className="text-muted-foreground">{expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}</span>
-                            </button>
-
-                            {expanded && (
-                              <>
-                                <div className="flex items-center justify-between gap-2">
-                                  <span className="text-xs text-muted-foreground">{t('task_detail.host_profile_last_seen')}: {host.lastSeen || t('common.na')}</span>
-                                </div>
-
-                                <div className="space-y-1.5">
-                                  <p className="text-xs uppercase text-muted-foreground">{t('task_detail.host_profile_roles')}</p>
-                                  <div className="flex flex-wrap gap-1.5">
-                                    {host.roles.map((role) => (
-                                      <span key={role} className="rounded-full border border-blue-500/30 bg-blue-500/10 px-2 py-0.5 text-xs text-blue-200">
-                                        {role}
-                                      </span>
-                                    ))}
-                                  </div>
-                                </div>
-
-                                <div className="space-y-1.5">
-                                  <p className="text-xs uppercase text-muted-foreground">{t('task_detail.host_profile_components')}</p>
-                                  <div className="flex flex-wrap gap-1.5">
-                                    {(host.components.length > 0 ? host.components : host.services).slice(0, 10).map((component) => (
-                                      <span key={component} className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-xs text-emerald-200">
-                                        {component}
-                                      </span>
-                                    ))}
-                                  </div>
-                                </div>
-
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                                  <div className="rounded-md border border-border/60 bg-background/40 p-2">
-                                    <p className="text-muted-foreground">{t('task_detail.host_profile_open_ports')}</p>
-                                    <p className="mt-1 font-mono text-foreground break-all">{host.openPorts.slice(0, 12).join(', ') || t('common.na')}</p>
-                                  </div>
-                                  <div className="rounded-md border border-border/60 bg-background/40 p-2">
-                                    <p className="text-muted-foreground">{t('task_detail.host_profile_protocols')}</p>
-                                    <p className="mt-1 text-foreground">{host.protocols.join(', ') || t('common.na')}</p>
-                                  </div>
-                                  <div className="rounded-md border border-border/60 bg-background/40 p-2">
-                                    <p className="text-muted-foreground">{t('task_detail.host_profile_services')}</p>
-                                    <p className="mt-1 text-foreground break-all">{host.services.slice(0, 8).join(', ') || t('common.na')}</p>
-                                  </div>
-                                  <div className="rounded-md border border-border/60 bg-background/40 p-2">
-                                    <p className="text-muted-foreground">{t('task_detail.host_profile_tools')}</p>
-                                    <p className="mt-1 text-foreground">{host.tools.join(', ') || t('common.na')}</p>
-                                  </div>
-                                </div>
-                              </>
-                            )}
-                          </>
-                        );
-                      })()}
-                    </div>
-                  ))}
-                </div>
-              )}
               {pager('assets', page, totalPages)}
             </>
           );

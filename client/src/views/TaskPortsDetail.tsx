@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Gauge, Layers, Search } from 'lucide-react';
+import { ArrowLeft, CircleHelp, Gauge, Layers, Search } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { Task } from '../types';
 import TaskResultsTable from '../components/TaskResultsTable';
@@ -55,23 +55,30 @@ export const TaskPortsDetail: React.FC<TaskPortsDetailProps> = ({ task, embedded
       .sort((a, b) => b.count - a.count);
   }, [rows, t]);
 
-  const portDistribution = useMemo(() => {
-    const map = new Map<number, number>();
+  const portRangeDistribution = useMemo(() => {
+    const buckets = [
+      { name: t('task_detail.port_bucket_well_known'), min: 0, max: 1023, count: 0 },
+      { name: t('task_detail.port_bucket_registered'), min: 1024, max: 49151, count: 0 },
+      { name: t('task_detail.port_bucket_dynamic'), min: 49152, max: 65535, count: 0 },
+    ];
     for (const row of rows) {
-      map.set(row.port, (map.get(row.port) ?? 0) + 1);
+      const port = Number(row.port);
+      if (!Number.isFinite(port)) continue;
+      const bucket = buckets.find((item) => port >= item.min && port <= item.max);
+      if (bucket) bucket.count += 1;
     }
-    return Array.from(map.entries())
-      .map(([port, count]) => ({ name: String(port), count }))
-      .sort((a, b) => b.count - a.count);
-  }, [rows]);
+    return buckets
+      .filter((item) => item.count > 0)
+      .map(({ name, count }) => ({ name, count }));
+  }, [rows, t]);
 
   const serviceDonutData = useMemo(
     () => compactTop(serviceDistribution, t('task_detail.ports_chart_other')),
     [serviceDistribution, t],
   );
   const portDonutData = useMemo(
-    () => compactTop(portDistribution, t('task_detail.ports_chart_other')),
-    [portDistribution, t],
+    () => portRangeDistribution.map((item) => ({ name: item.name, value: item.count })),
+    [portRangeDistribution],
   );
 
   const filteredRows = useMemo(() => {
@@ -93,26 +100,26 @@ export const TaskPortsDetail: React.FC<TaskPortsDetailProps> = ({ task, embedded
   const portTotal = portDonutData.reduce((sum, item) => sum + item.value, 0);
 
   const statsGrid = (
-    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-      <Card className="py-3 gap-2 border-emerald-500/30 bg-gradient-to-br from-emerald-500/10 via-card to-card">
-        <CardContent className="px-4 flex items-center gap-3 text-xs text-muted-foreground">
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+      <Card className="py-2 gap-1 border-emerald-500/30 bg-gradient-to-br from-emerald-500/10 via-card to-card">
+        <CardContent className="px-3 flex items-center gap-2 text-[11px] text-muted-foreground">
           <Gauge size={16} className="text-emerald-400" />
           <span>{t('task_detail.label_open_ports')}</span>
-          <strong className="ml-auto text-base text-foreground">{openPortsCount}</strong>
+          <strong className="ml-auto text-sm sm:text-base text-foreground">{openPortsCount}</strong>
         </CardContent>
       </Card>
-      <Card className="py-3 gap-2 border-blue-500/30 bg-gradient-to-br from-blue-500/10 via-card to-card">
-        <CardContent className="px-4 flex items-center gap-3 text-xs text-muted-foreground">
+      <Card className="py-2 gap-1 border-blue-500/30 bg-gradient-to-br from-blue-500/10 via-card to-card">
+        <CardContent className="px-3 flex items-center gap-2 text-[11px] text-muted-foreground">
           <Layers size={16} className="text-blue-400" />
           <span>{t('task_detail.ports_unique_ports')}</span>
-          <strong className="ml-auto text-base text-foreground">{uniquePortsCount}</strong>
+          <strong className="ml-auto text-sm sm:text-base text-foreground">{uniquePortsCount}</strong>
         </CardContent>
       </Card>
-      <Card className="py-3 gap-2 border-violet-500/30 bg-gradient-to-br from-violet-500/10 via-card to-card">
-        <CardContent className="px-4 flex items-center gap-3 text-xs text-muted-foreground">
+      <Card className="py-2 gap-1 border-violet-500/30 bg-gradient-to-br from-violet-500/10 via-card to-card">
+        <CardContent className="px-3 flex items-center gap-2 text-[11px] text-muted-foreground">
           <Layers size={16} className="text-violet-400" />
           <span>{t('task_detail.stat_services')}</span>
-          <strong className="ml-auto text-base text-foreground">{servicesCount}</strong>
+          <strong className="ml-auto text-sm sm:text-base text-foreground">{servicesCount}</strong>
         </CardContent>
       </Card>
     </div>
@@ -129,40 +136,55 @@ export const TaskPortsDetail: React.FC<TaskPortsDetailProps> = ({ task, embedded
   ) => (
     <Card className="py-4 gap-3 border-border/70 bg-card/70 min-h-0 overflow-hidden">
       <CardHeader className="px-4 pb-0">
-        <CardTitle className="text-sm">{title}</CardTitle>
-        <CardDescription>{subtitle}</CardDescription>
+        <div className="flex items-center gap-2">
+          <CardTitle className="text-sm">{title}</CardTitle>
+          <div className="relative group">
+            <button
+              type="button"
+              className="inline-flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+              aria-label={subtitle}
+            >
+              <CircleHelp size={14} />
+            </button>
+            <div className="pointer-events-none absolute left-1/2 top-full z-20 mt-1 w-52 -translate-x-1/2 rounded-md border border-border/70 bg-popover px-2 py-1.5 text-[11px] text-popover-foreground opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+              {subtitle}
+            </div>
+          </div>
+        </div>
       </CardHeader>
-      <CardContent className="px-4 min-h-0 space-y-3">
-        <div className="relative h-56 rounded-md border border-border/60 bg-background/40">
+      <CardContent className="px-3 sm:px-4 min-h-0 space-y-2">
+        <div className="relative h-[270px] sm:h-[300px] lg:h-[320px]">
           {data.length > 0 ? (
             <>
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={data}
-                    dataKey="value"
-                    nameKey="name"
-                    innerRadius={58}
-                    outerRadius={90}
-                    paddingAngle={2}
-                    onClick={(_, index) => {
-                      if (onItemClick) onItemClick(data[index]);
-                    }}
-                  >
-                    {data.map((entry, index) => (
-                      <Cell
-                        key={entry.name}
-                        fill={CHART_COLORS[index % CHART_COLORS.length]}
-                        className={onItemClick && !entry.filterValue ? 'opacity-70' : ''}
-                      />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    formatter={(value) => [value, t('task_detail.label_open_ports')]}
-                    contentStyle={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: '8px' }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
+              <div className="h-full w-full max-w-[360px] sm:max-w-[400px] mx-auto">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={data}
+                      dataKey="value"
+                      nameKey="name"
+                      innerRadius="58%"
+                      outerRadius="84%"
+                      paddingAngle={2}
+                      onClick={(_, index) => {
+                        if (onItemClick) onItemClick(data[index]);
+                      }}
+                    >
+                      {data.map((entry, index) => (
+                        <Cell
+                          key={entry.name}
+                          fill={CHART_COLORS[index % CHART_COLORS.length]}
+                          className={onItemClick && !entry.filterValue ? 'opacity-70' : ''}
+                        />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      formatter={(value) => [value, t('task_detail.label_open_ports')]}
+                      contentStyle={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: '8px' }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
               <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
                 <div className="text-center">
                   <p className="text-2xl font-semibold text-foreground">{total}</p>
@@ -177,8 +199,8 @@ export const TaskPortsDetail: React.FC<TaskPortsDetailProps> = ({ task, embedded
           )}
         </div>
 
-        <ScrollArea className="h-28 rounded-md border border-border/60 bg-background/30">
-          <div className="p-2 space-y-1.5">
+        <ScrollArea className="h-28">
+          <div className="px-1 pb-1 grid grid-cols-1 sm:grid-cols-2 gap-1.5">
             {data.map((item, index) => {
               const percent = total > 0 ? Math.round((item.value / total) * 100) : 0;
               const isActive = !!activeFilter && activeFilter === item.filterValue;
@@ -186,7 +208,7 @@ export const TaskPortsDetail: React.FC<TaskPortsDetailProps> = ({ task, embedded
               return (
                 <button
                   key={item.name}
-                  className={`w-full text-left rounded-md border px-2.5 py-1.5 text-xs transition-colors ${isActive ? 'border-primary/60 bg-primary/10' : 'border-border/50 hover:bg-accent/60'} ${clickable ? '' : 'cursor-default'}`}
+                  className={`w-full text-left rounded-md border px-2 py-1.5 text-xs transition-colors ${isActive ? 'border-primary/60 bg-primary/10' : 'border-border/50 hover:bg-accent/60'} ${clickable ? '' : 'cursor-default'}`}
                   onClick={() => {
                     if (onItemClick) onItemClick(item);
                   }}
@@ -207,7 +229,7 @@ export const TaskPortsDetail: React.FC<TaskPortsDetailProps> = ({ task, embedded
   );
 
   const distributionPanel = (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 min-h-0">
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 min-h-0 shrink-0">
       {donutBlock(
         t('task_detail.ports_service_donut_title'),
         t('task_detail.ports_service_donut_desc'),
@@ -232,7 +254,7 @@ export const TaskPortsDetail: React.FC<TaskPortsDetailProps> = ({ task, embedded
   );
 
   const tablePanel = (
-    <Card className="py-4 gap-4 border-border/70 bg-card/70 min-h-0 overflow-hidden">
+    <Card className="py-4 gap-4 border-border/70 bg-card/70 min-h-0 overflow-hidden shrink-0">
       <CardHeader className="px-4 pb-0">
         <CardTitle className="text-sm">{t('task_detail.scan_results')}</CardTitle>
         <CardDescription>
