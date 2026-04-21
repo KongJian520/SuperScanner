@@ -246,44 +246,10 @@ export const TaskDetail: React.FC<TaskDetailProps> = ({ task, activeSection = 'a
         />
         <div className="absolute inset-0 pointer-events-none opacity-20 bg-[radial-gradient(circle_at_20%_20%,rgba(59,130,246,0.35),transparent_55%)]" />
         <div className="relative z-10 min-w-0 w-full">
-          <div className="flex items-center justify-between gap-3 mb-1">
+          <div className="flex items-center gap-3 mb-1">
             <div className="flex items-center gap-3 min-w-0">
               <h2 className="text-lg sm:text-xl font-bold text-foreground truncate">{task.name}</h2>
               <TaskStatusBadge status={task.status} />
-            </div>
-            <div className="relative shrink-0" ref={exportMenuRef}>
-              <motion.button
-                type="button"
-                disabled={results.length === 0}
-                onClick={() => setExportMenuOpen((prev) => !prev)}
-                whileTap={{ scale: microInteraction.actionButtonPress.scale }}
-                transition={{ duration: microInteraction.actionButtonPress.duration, ease: microInteraction.actionButtonPress.ease }}
-                className="inline-flex items-center gap-2 rounded-md border border-border bg-background/80 px-3 py-1.5 text-sm font-semibold text-foreground transition-colors hover:bg-accent/70 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap shrink-0"
-              >
-                <Settings2 size={14} />
-                <span>{t('task_detail.export_report')}</span>
-                <ChevronDown size={14} className={`transition-transform ${exportMenuOpen ? 'rotate-180' : ''}`} />
-              </motion.button>
-              {exportMenuOpen && (
-                <div className="absolute right-0 top-[calc(100%+0.4rem)] z-30 min-w-[170px] overflow-hidden rounded-md border border-border bg-popover shadow-lg">
-                  <button
-                    type="button"
-                    onClick={() => handleExport('csv')}
-                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-popover-foreground transition-colors hover:bg-accent/70"
-                  >
-                    <Download size={14} />
-                    <span>{t('task_detail.export_csv')}</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleExport('json')}
-                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-popover-foreground transition-colors hover:bg-accent/70"
-                  >
-                    <Download size={14} />
-                    <span>{t('task_detail.export_json')}</span>
-                  </button>
-                </div>
-              )}
             </div>
           </div>
           <p className="min-h-5 text-sm text-muted-foreground italic truncate">
@@ -300,7 +266,41 @@ export const TaskDetail: React.FC<TaskDetailProps> = ({ task, activeSection = 'a
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-2 relative z-10 w-full sm:w-auto sm:justify-end">
+        <div className="flex flex-wrap items-center gap-2 relative z-10 w-full sm:w-auto sm:justify-end">
+          <div className="relative shrink-0" ref={exportMenuRef}>
+            <motion.button
+              type="button"
+              disabled={results.length === 0}
+              onClick={() => setExportMenuOpen((prev) => !prev)}
+              whileTap={{ scale: microInteraction.actionButtonPress.scale }}
+              transition={{ duration: microInteraction.actionButtonPress.duration, ease: microInteraction.actionButtonPress.ease }}
+              className="inline-flex items-center gap-2 rounded-md border border-border bg-background/80 px-3 py-1.5 text-sm font-semibold text-foreground transition-colors hover:bg-accent/70 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap shrink-0"
+            >
+              <Settings2 size={14} />
+              <span>{t('task_detail.export_report')}</span>
+              <ChevronDown size={14} className={`transition-transform ${exportMenuOpen ? 'rotate-180' : ''}`} />
+            </motion.button>
+            {exportMenuOpen && (
+              <div className="absolute right-0 top-[calc(100%+0.4rem)] z-30 min-w-[170px] overflow-hidden rounded-md border border-border bg-popover shadow-lg">
+                <button
+                  type="button"
+                  onClick={() => handleExport('csv')}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-popover-foreground transition-colors hover:bg-accent/70"
+                >
+                  <Download size={14} />
+                  <span>{t('task_detail.export_csv')}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleExport('json')}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-popover-foreground transition-colors hover:bg-accent/70"
+                >
+                  <Download size={14} />
+                  <span>{t('task_detail.export_json')}</span>
+                </button>
+              </div>
+            )}
+          </div>
           {(task.status === TaskStatus.PENDING || task.status === TaskStatus.PAUSED) && (
             <motion.button
               onClick={handleStart}
