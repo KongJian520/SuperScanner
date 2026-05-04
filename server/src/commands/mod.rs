@@ -81,8 +81,7 @@ impl CommandRegistry {
 
     /// 注册命令实例（便利方法，内部转换为工厂）
     pub fn register<C: ScannerCommand + 'static>(mut self, cmd: C) -> Self {
-        let mut map = Arc::try_unwrap(self.commands)
-            .unwrap_or_else(|arc| (*arc).clone());
+        let mut map = Arc::try_unwrap(self.commands).unwrap_or_else(|arc| (*arc).clone());
         let id = cmd.id().to_string();
         map.insert(id, Arc::new(RegistryEntry::Instance(Box::new(cmd))));
         self.commands = Arc::new(map);
@@ -91,8 +90,7 @@ impl CommandRegistry {
 
     /// 注册工厂函数（支持带配置的命令，每次 get_instance 返回新实例）
     pub fn register_factory(mut self, id: &'static str, factory: CommandFactory) -> Self {
-        let mut map = Arc::try_unwrap(self.commands)
-            .unwrap_or_else(|arc| (*arc).clone());
+        let mut map = Arc::try_unwrap(self.commands).unwrap_or_else(|arc| (*arc).clone());
         map.insert(id.to_string(), Arc::new(RegistryEntry::Factory(factory)));
         self.commands = Arc::new(map);
         self
@@ -117,16 +115,18 @@ impl CommandRegistry {
     }
 }
 
-pub mod ping;
+pub mod curl;
+pub mod fscan;
+pub mod httpx;
 pub mod nmap;
+pub mod nuclei;
+pub mod ping;
 pub mod port_scan;
 pub mod service_probes;
-pub mod curl;
-pub mod httpx;
-pub mod nuclei;
 
-pub use ping::PingCommand;
-pub use nmap::NmapCommand;
-pub use port_scan::BuiltinPortScanCommand;
+pub use fscan::FscanCommand;
 pub use httpx::HttpxCommand;
+pub use nmap::NmapCommand;
 pub use nuclei::NucleiCommand;
+pub use ping::PingCommand;
+pub use port_scan::BuiltinPortScanCommand;

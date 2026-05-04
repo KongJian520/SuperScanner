@@ -60,10 +60,11 @@ impl ScannerCommand for BuiltinPortScanCommand {
         let top_ports = vec![21, 22, 23, 25, 53, 80, 110, 143, 443, 445, 3306, 3389, 8080];
         for port in top_ports {
             let addr = format!("{}:{}", target, port);
-            let is_open = tokio::time::timeout(Duration::from_millis(500), TcpStream::connect(&addr))
-                .await
-                .map(|r| r.is_ok())
-                .unwrap_or(false);
+            let is_open =
+                tokio::time::timeout(Duration::from_millis(500), TcpStream::connect(&addr))
+                    .await
+                    .map(|r| r.is_ok())
+                    .unwrap_or(false);
 
             if is_open {
                 let banner = grab_banner(target, port as u16).await;
@@ -104,7 +105,8 @@ async fn grab_banner(target: &str, port: u16) -> Vec<u8> {
     let mut out = Vec::new();
     let mut buf = [0u8; 2048];
 
-    if let Ok(Ok(n)) = tokio::time::timeout(Duration::from_millis(220), stream.read(&mut buf)).await {
+    if let Ok(Ok(n)) = tokio::time::timeout(Duration::from_millis(220), stream.read(&mut buf)).await
+    {
         if n > 0 {
             out.extend_from_slice(&buf[..n]);
         }
@@ -113,7 +115,9 @@ async fn grab_banner(target: &str, port: u16) -> Vec<u8> {
     if out.is_empty() {
         for payload in probe_payloads(target, port) {
             let _ = stream.write_all(payload.as_bytes()).await;
-            if let Ok(Ok(n)) = tokio::time::timeout(Duration::from_millis(420), stream.read(&mut buf)).await {
+            if let Ok(Ok(n)) =
+                tokio::time::timeout(Duration::from_millis(420), stream.read(&mut buf)).await
+            {
                 if n > 0 {
                     out.extend_from_slice(&buf[..n]);
                     break;

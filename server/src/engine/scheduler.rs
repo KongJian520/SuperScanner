@@ -48,7 +48,9 @@ impl SqliteScheduler {
         .await
         .map_err(|e| AppError::Storage(format!("无法创建 task_queue 表: {}", e)))?;
 
-        Ok(Self { pool: Arc::new(Mutex::new(pool)) })
+        Ok(Self {
+            pool: Arc::new(Mutex::new(pool)),
+        })
     }
 }
 
@@ -100,10 +102,11 @@ impl Scheduler for SqliteScheduler {
             .await
             .map_err(|e| AppError::Storage(format!("恢复任务失败: {}", e)))?;
 
-        let rows: Vec<(String,)> = sqlx::query_as("SELECT task_id FROM task_queue WHERE status = 'queued'")
-            .fetch_all(&*pool)
-            .await
-            .map_err(|e| AppError::Storage(format!("查询待恢复任务失败: {}", e)))?;
+        let rows: Vec<(String,)> =
+            sqlx::query_as("SELECT task_id FROM task_queue WHERE status = 'queued'")
+                .fetch_all(&*pool)
+                .await
+                .map_err(|e| AppError::Storage(format!("查询待恢复任务失败: {}", e)))?;
 
         Ok(rows.into_iter().map(|(id,)| id).collect())
     }
@@ -114,10 +117,18 @@ pub struct NoopScheduler;
 
 #[async_trait]
 impl Scheduler for NoopScheduler {
-    async fn enqueue(&self, _task_id: &str) -> Result<(), AppError> { Ok(()) }
-    async fn complete(&self, _task_id: &str) -> Result<(), AppError> { Ok(()) }
-    async fn fail(&self, _task_id: &str, _reason: &str) -> Result<(), AppError> { Ok(()) }
-    async fn recover_running(&self) -> Result<Vec<String>, AppError> { Ok(vec![]) }
+    async fn enqueue(&self, _task_id: &str) -> Result<(), AppError> {
+        Ok(())
+    }
+    async fn complete(&self, _task_id: &str) -> Result<(), AppError> {
+        Ok(())
+    }
+    async fn fail(&self, _task_id: &str, _reason: &str) -> Result<(), AppError> {
+        Ok(())
+    }
+    async fn recover_running(&self) -> Result<Vec<String>, AppError> {
+        Ok(vec![])
+    }
 }
 
 #[cfg(test)]
@@ -128,7 +139,9 @@ mod tests {
     #[tokio::test]
     async fn test_enqueue_complete_fail() {
         let dir = tempdir().unwrap();
-        let scheduler = SqliteScheduler::new(&dir.path().to_path_buf()).await.unwrap();
+        let scheduler = SqliteScheduler::new(&dir.path().to_path_buf())
+            .await
+            .unwrap();
 
         scheduler.enqueue("task-1").await.unwrap();
         scheduler.complete("task-1").await.unwrap();
@@ -140,7 +153,9 @@ mod tests {
     #[tokio::test]
     async fn test_recover_running() {
         let dir = tempdir().unwrap();
-        let scheduler = SqliteScheduler::new(&dir.path().to_path_buf()).await.unwrap();
+        let scheduler = SqliteScheduler::new(&dir.path().to_path_buf())
+            .await
+            .unwrap();
 
         // 模拟重启前有 running 的任务
         scheduler.enqueue("task-running").await.unwrap();

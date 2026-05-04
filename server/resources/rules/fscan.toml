@@ -1,0 +1,18 @@
+[tool]
+id = "fscan"
+name = "fscan"
+description = "Fast internal network scanner"
+
+[command]
+args_template = ["-json", "-h", "{{target}}"]
+
+[parse]
+format = "jsonl"
+field_mappings = { host = "target", port = "port", protocol = "protocol", service = "service", banner = "banner" }
+
+[normalize.maps.protocol]
+tcp = "tcp"
+udp = "udp"
+
+[persist]
+targets = ["target", "port", "protocol", "service", "banner"]

@@ -5,6 +5,7 @@ package status.v1;
 // ServerInfo 服务：查询服务器信息（主机名、OS、uptime、资源信息等）。
 service ServerInfo {
   rpc GetInfo (ServerInfoRequest) returns (ServerInfoResponse);
+  rpc SyncNucleiTemplates (SyncNucleiTemplatesRequest) returns (SyncNucleiTemplatesResponse);
 }
 
 message ServerInfoRequest {
@@ -23,6 +24,7 @@ message ServerInfoResponse {
   uint64 disk_total_bytes = 9;
   uint64 disk_free_bytes = 10;
   repeated ToolCapability tools = 11;
+  NucleiTemplatesStatus nuclei_templates = 12;
 
 }
 
@@ -31,4 +33,26 @@ message ToolCapability {
   bool available = 2;
   string source = 3;
   string path = 4;
+}
+
+message NucleiTemplatesStatus {
+  string source = 1; // local|cache|none
+  string configured_local_path = 2;
+  string effective_path = 3;
+  string repo_url = 4;
+  string cache_path = 5;
+  int64 last_sync_unix = 6;
+  string last_error = 7;
+  bool sync_supported = 8;
+}
+
+message SyncNucleiTemplatesRequest {
+  string local_path = 1; // optional; empty means no update
+  string repo_url = 2;   // optional; empty means keep current
+  bool clear_local_path = 3;
+}
+
+message SyncNucleiTemplatesResponse {
+  NucleiTemplatesStatus status = 1;
+  string message = 2;
 }

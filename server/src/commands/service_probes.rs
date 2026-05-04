@@ -5,7 +5,8 @@ use std::fs;
 use std::path::Path;
 use tracing::warn;
 
-const DEFAULT_PROBES_PATH: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/resources/nmap-service-probes");
+const DEFAULT_PROBES_PATH: &str =
+    concat!(env!("CARGO_MANIFEST_DIR"), "/resources/nmap-service-probes");
 
 #[derive(Debug)]
 struct ProbeMatch {
@@ -184,13 +185,20 @@ static MATCHER: Lazy<Option<ServiceProbeMatcher>> = Lazy::new(|| {
     let content = match fs::read_to_string(probe_path) {
         Ok(c) => c,
         Err(e) => {
-            warn!("无法读取 nmap-service-probes [{}]: {}", probe_path.display(), e);
+            warn!(
+                "无法读取 nmap-service-probes [{}]: {}",
+                probe_path.display(),
+                e
+            );
             return None;
         }
     };
     let matcher = ServiceProbeMatcher::from_content(&content);
     if matcher.rules.is_empty() {
-        warn!("nmap-service-probes 加载成功但无可用规则: {}", probe_path.display());
+        warn!(
+            "nmap-service-probes 加载成功但无可用规则: {}",
+            probe_path.display()
+        );
         None
     } else {
         Some(matcher)

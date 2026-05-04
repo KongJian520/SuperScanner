@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use sqlx::sqlite::SqlitePool;
 use std::path::PathBuf;
 use tokio::process::Command;
-use tokio::time::{timeout, Duration};
+use tokio::time::{Duration, timeout};
 use tracing::warn;
 
 #[derive(Clone)]
@@ -74,19 +74,24 @@ impl ScannerCommand for NmapCommand {
         pool: &SqlitePool,
     ) -> Result<(), AppError> {
         let mut cmd = Command::new(&self.binary);
-        cmd.args(&self.default_args)
-            .arg(target)
-            .arg("-oG")
-            .arg("-");
+        cmd.args(&self.default_args).arg(target).arg("-oG").arg("-");
 
         let output = timeout(Duration::from_secs(self.timeout_secs), cmd.output())
             .await
-            .map_err(|_| AppError::Task(format!("Nmap 扫描超时: {} ({}s)", target, self.timeout_secs)))?
+            .map_err(|_| {
+                AppError::Task(format!(
+                    "Nmap 扫描超时: {} ({}s)",
+                    target, self.timeout_secs
+                ))
+            })?
             .map_err(|e| AppError::Task(format!("无法启动 Nmap: {}", e)))?;
 
         if !output.status.success() {
             let err = String::from_utf8_lossy(&output.stderr).trim().to_string();
-            return Err(AppError::Task(format!("Nmap 扫描失败 [{}]: {}", target, err)));
+            return Err(AppError::Task(format!(
+                "Nmap 扫描失败 [{}]: {}",
+                target, err
+            )));
         }
 
         let stdout = String::from_utf8_lossy(&output.stdout);
@@ -111,7 +116,11 @@ impl ScannerCommand for NmapCommand {
                 if state.is_empty() || protocol.is_empty() {
                     continue;
                 }
-                let final_service = if service.is_empty() { "unknown" } else { service };
+                let final_service = if service.is_empty() {
+                    "unknown"
+                } else {
+                    service
+                };
                 if let Err(e) = sqlx::query("INSERT OR REPLACE INTO port_results (ip, port, protocol, state, service, tool) VALUES (?, ?, ?, ?, ?, ?)")
                     .bind(target)
                     .bind(port)

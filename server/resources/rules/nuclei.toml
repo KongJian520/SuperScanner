@@ -1,0 +1,21 @@
+[tool]
+id = "nuclei"
+name = "nuclei"
+description = "Template based vulnerability scanner"
+
+[command]
+args_template = ["-silent", "-jsonl", "-u", "{{target}}"]
+
+[parse]
+format = "jsonl"
+field_mappings = { matched_at = "target", template_id = "template_id", severity = "severity", name = "name", type = "type" }
+
+[normalize.maps.severity]
+info = "info"
+low = "low"
+medium = "medium"
+high = "high"
+critical = "critical"
+
+[persist]
+targets = ["target", "template_id", "severity", "name", "type"]

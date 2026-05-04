@@ -1,9 +1,9 @@
-pub mod worker;
 pub mod scheduler;
+pub mod worker;
 
+use crate::commands::CommandRegistry;
 use crate::domain::traits::{CommandParser, TaskManager, TaskStore};
 use crate::domain::types::{CommandSpec, RunnerEvent};
-use crate::commands::CommandRegistry;
 use crate::engine::scheduler::Scheduler;
 use crate::error::AppError;
 use async_trait::async_trait;
@@ -32,7 +32,12 @@ pub struct BackgroundTaskRunner {
 }
 
 impl BackgroundTaskRunner {
-    pub fn new(tasks_dir: PathBuf, store: Arc<dyn TaskStore>, registry: CommandRegistry, scheduler: Arc<dyn Scheduler>) -> Self {
+    pub fn new(
+        tasks_dir: PathBuf,
+        store: Arc<dyn TaskStore>,
+        registry: CommandRegistry,
+        scheduler: Arc<dyn Scheduler>,
+    ) -> Self {
         Self {
             tasks_dir,
             store,
@@ -61,7 +66,11 @@ impl TaskManager for BackgroundTaskRunner {
             return Err(AppError::Task("任务已在运行中".to_string()));
         }
 
-        let meta = self.store.get_task(id).await?.ok_or(AppError::Task("Task not found".to_string()))?;
+        let meta = self
+            .store
+            .get_task(id)
+            .await?
+            .ok_or(AppError::Task("Task not found".to_string()))?;
         let task_dir = self.tasks_dir.join(id);
 
         let specs = if !meta.workflow.steps.is_empty() {
@@ -73,7 +82,13 @@ impl TaskManager for BackgroundTaskRunner {
                         1 => "builtin_port_scan".to_string(),
                         2 => "httpx".to_string(),
                         3 => "nuclei".to_string(),
-                        _ => return Err(AppError::Config(format!("无效的 workflow step type: {}", step.r#type))),
+                        4 => "fscan".to_string(),
+                        _ => {
+                            return Err(AppError::Config(format!(
+                                "无效的 workflow step type: {}",
+                                step.r#type
+                            )));
+                        }
                     }
                 } else {
                     step.tool.clone()
@@ -123,12 +138,26 @@ impl TaskManager for BackgroundTaskRunner {
         let join_handle = tokio::spawn(async move {
             // 入队
             let _ = scheduler.enqueue(&task_id).await;
-            worker::run_task_loop(task_id.clone(), specs, store, bc_clone, stop_rx, cancel_rx, task_dir, registry, scheduler.clone()).await;
+            worker::run_task_loop(
+                task_id.clone(),
+                specs,
+                store,
+                bc_clone,
+                stop_rx,
+                cancel_rx,
+                task_dir,
+                registry,
+                scheduler.clone(),
+            )
+            .await;
 
             // Cleanup: remove from running_tasks when done
             let mut tasks = running_tasks_clone.write().await;
             if tasks.remove(&task_id_cleanup).is_some() {
-                info!("Task {} removed from running_tasks map (finished naturally)", task_id_cleanup);
+                info!(
+                    "Task {} removed from running_tasks map (finished naturally)",
+                    task_id_cleanup
+                );
             }
         });
 

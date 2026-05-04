@@ -1,20 +1,20 @@
+use crate::commands::CommandRegistry;
 use crate::domain::traits::{CommandParser, TaskStore};
 use crate::domain::types::{CommandSpec, RunnerEvent, TaskMetadataPatch};
-use crate::commands::CommandRegistry;
 use crate::engine::scheduler::Scheduler;
 use crate::error::AppError;
 use async_trait::async_trait;
 use chrono::Utc;
+use sqlx::sqlite::SqlitePool;
 use std::path::PathBuf;
 use std::process::Stdio;
 use std::sync::Arc;
+use super_scanner_shared::models::TaskStatus;
 use tokio::fs::OpenOptions;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::Command;
-use tokio::sync::{broadcast, mpsc, watch, Semaphore};
-use super_scanner_shared::models::TaskStatus;
+use tokio::sync::{Semaphore, broadcast, mpsc, watch};
 use tracing::{error, info};
-use sqlx::sqlite::SqlitePool;
 
 /// 简单命令解析器：支持 metadata.toml 中的 command_spec 或 workflow.json
 pub struct SimpleCommandParser {}
@@ -24,7 +24,8 @@ impl CommandParser for SimpleCommandParser {
     async fn parse(&self, task_dir: &PathBuf) -> Result<Vec<CommandSpec>, AppError> {
         let workflow_path = task_dir.join("workflow.json");
         if workflow_path.exists() {
-            let content = tokio::fs::read_to_string(&workflow_path).await
+            let content = tokio::fs::read_to_string(&workflow_path)
+                .await
                 .map_err(|e| AppError::Config(format!("无法读取 workflow.json: {}", e)))?;
             let workflow: Vec<String> = serde_json::from_str(&content)
                 .map_err(|e| AppError::Config(format!("workflow.json 格式错误: {}", e)))?;
@@ -33,10 +34,12 @@ impl CommandParser for SimpleCommandParser {
             for cmd_id in workflow {
                 let spec_path = task_dir.join("commands").join(&cmd_id).join("spec.toml");
                 if spec_path.exists() {
-                    let content = tokio::fs::read_to_string(&spec_path).await
-                        .map_err(|e| AppError::Config(format!("无法读取 spec.toml [{}]: {}", cmd_id, e)))?;
-                    let mut spec: CommandSpec = toml::from_str(&content)
-                        .map_err(|e| AppError::Config(format!("spec.toml 格式错误 [{}]: {}", cmd_id, e)))?;
+                    let content = tokio::fs::read_to_string(&spec_path).await.map_err(|e| {
+                        AppError::Config(format!("无法读取 spec.toml [{}]: {}", cmd_id, e))
+                    })?;
+                    let mut spec: CommandSpec = toml::from_str(&content).map_err(|e| {
+                        AppError::Config(format!("spec.toml 格式错误 [{}]: {}", cmd_id, e))
+                    })?;
                     spec.id = cmd_id;
                     specs.push(spec);
                 }
@@ -44,7 +47,9 @@ impl CommandParser for SimpleCommandParser {
             return Ok(specs);
         }
 
-        Err(AppError::Config("未找到任务定义 (workflow.json)".to_string()))
+        Err(AppError::Config(
+            "未找到任务定义 (workflow.json)".to_string(),
+        ))
     }
 }
 
@@ -60,7 +65,17 @@ pub async fn run_task_loop(
     scheduler: Arc<dyn Scheduler>,
 ) {
     // 更新状态为 RUNNING
-    if let Err(e) = store.set_status(&task_id, TaskStatus::Running.as_i32(), Some(0), None, None, None).await {
+    if let Err(e) = store
+        .set_status(
+            &task_id,
+            TaskStatus::Running.as_i32(),
+            Some(0),
+            None,
+            None,
+            None,
+        )
+        .await
+    {
         error!("无法更新任务状态: {}", e);
         let _ = scheduler.fail(&task_id, &e.to_string()).await;
         return;
@@ -71,7 +86,16 @@ pub async fn run_task_loop(
         Ok(p) => p,
         Err(e) => {
             let msg = format!("无法连接任务数据库: {}", e);
-            let _ = store.set_status(&task_id, TaskStatus::Failed.as_i32(), None, Some(-1), Some(msg.clone()), Some(Utc::now().timestamp_millis())).await;
+            let _ = store
+                .set_status(
+                    &task_id,
+                    TaskStatus::Failed.as_i32(),
+                    None,
+                    Some(-1),
+                    Some(msg.clone()),
+                    Some(Utc::now().timestamp_millis()),
+                )
+                .await;
             let _ = scheduler.fail(&task_id, &msg).await;
             return;
         }
@@ -84,18 +108,30 @@ pub async fn run_task_loop(
             // === 并行执行模式 ===
             if let Err(e) = cmd_impl.init_db(&pool).await {
                 let msg = format!("DB Init failed for {}: {}", cmd_id, e);
-                let _ = store.set_status(&task_id, TaskStatus::Failed.as_i32(), None, Some(-1), Some(msg.clone()), Some(Utc::now().timestamp_millis())).await;
+                let _ = store
+                    .set_status(
+                        &task_id,
+                        TaskStatus::Failed.as_i32(),
+                        None,
+                        Some(-1),
+                        Some(msg.clone()),
+                        Some(Utc::now().timestamp_millis()),
+                    )
+                    .await;
                 let _ = scheduler.fail(&task_id, &msg).await;
                 return;
             }
 
             let total_row: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM targets")
-                .fetch_one(&pool).await
+                .fetch_one(&pool)
+                .await
                 .unwrap_or((0,));
             let total_targets = total_row.0 as usize;
 
-            let targets_result: Result<Vec<(String,)>, _> = sqlx::query_as("SELECT ip FROM targets WHERE status = 'pending'")
-                .fetch_all(&pool).await;
+            let targets_result: Result<Vec<(String,)>, _> =
+                sqlx::query_as("SELECT ip FROM targets WHERE status = 'pending'")
+                    .fetch_all(&pool)
+                    .await;
 
             let targets = match targets_result {
                 Ok(t) => t,
@@ -106,7 +142,11 @@ pub async fn run_task_loop(
                 }
             };
 
-            let initial_completed = if total_targets > targets.len() { total_targets - targets.len() } else { 0 };
+            let initial_completed = if total_targets > targets.len() {
+                total_targets - targets.len()
+            } else {
+                0
+            };
 
             let (update_tx, mut update_rx) = mpsc::channel::<(String, bool)>(1000);
             let pool_for_updater = pool.clone();
@@ -120,24 +160,40 @@ pub async fn run_task_loop(
                 let mut last_saved_progress: u8 = 0;
 
                 let flush = |pool: SqlitePool, items: Vec<(String, bool)>| async move {
-                    if items.is_empty() { return; }
+                    if items.is_empty() {
+                        return;
+                    }
                     let mut finished_ips = Vec::new();
                     let mut failed_ips = Vec::new();
                     for (ip, success) in items {
-                        if success { finished_ips.push(ip); } else { failed_ips.push(ip); }
+                        if success {
+                            finished_ips.push(ip);
+                        } else {
+                            failed_ips.push(ip);
+                        }
                     }
                     if !finished_ips.is_empty() {
                         let placeholders: Vec<&str> = finished_ips.iter().map(|_| "?").collect();
-                        let sql = format!("UPDATE targets SET status = 'finished' WHERE ip IN ({})", placeholders.join(","));
+                        let sql = format!(
+                            "UPDATE targets SET status = 'finished' WHERE ip IN ({})",
+                            placeholders.join(",")
+                        );
                         let mut query = sqlx::query(&sql);
-                        for ip in finished_ips { query = query.bind(ip); }
+                        for ip in finished_ips {
+                            query = query.bind(ip);
+                        }
                         let _ = query.execute(&pool).await;
                     }
                     if !failed_ips.is_empty() {
                         let placeholders: Vec<&str> = failed_ips.iter().map(|_| "?").collect();
-                        let sql = format!("UPDATE targets SET status = 'failed' WHERE ip IN ({})", placeholders.join(","));
+                        let sql = format!(
+                            "UPDATE targets SET status = 'failed' WHERE ip IN ({})",
+                            placeholders.join(",")
+                        );
                         let mut query = sqlx::query(&sql);
-                        for ip in failed_ips { query = query.bind(ip); }
+                        for ip in failed_ips {
+                            query = query.bind(ip);
+                        }
                         let _ = query.execute(&pool).await;
                     }
                 };
@@ -161,10 +217,15 @@ pub async fn run_task_loop(
                         flush(pool_for_updater.clone(), items).await;
 
                         if percent > last_saved_progress {
-                            let _ = store_for_updater.update_task(&task_id_for_updater, &TaskMetadataPatch {
-                                progress: Some(percent),
-                                ..Default::default()
-                            }).await;
+                            let _ = store_for_updater
+                                .update_task(
+                                    &task_id_for_updater,
+                                    &TaskMetadataPatch {
+                                        progress: Some(percent),
+                                        ..Default::default()
+                                    },
+                                )
+                                .await;
                             last_saved_progress = percent;
                         }
                     }
@@ -179,10 +240,15 @@ pub async fn run_task_loop(
                     } else {
                         0
                     };
-                    let _ = store_for_updater.update_task(&task_id_for_updater, &TaskMetadataPatch {
-                        progress: Some(percent),
-                        ..Default::default()
-                    }).await;
+                    let _ = store_for_updater
+                        .update_task(
+                            &task_id_for_updater,
+                            &TaskMetadataPatch {
+                                progress: Some(percent),
+                                ..Default::default()
+                            },
+                        )
+                        .await;
                 }
             });
 
@@ -215,7 +281,10 @@ pub async fn run_task_loop(
                         let _ = update_tx_clone.send((target_clone, false)).await;
                         return;
                     }
-                    let success = cmd_clone.execute_target(&target_clone, &task_dir_clone, &pool_clone).await.is_ok();
+                    let success = cmd_clone
+                        .execute_target(&target_clone, &task_dir_clone, &pool_clone)
+                        .await
+                        .is_ok();
                     let _ = update_tx_clone.send((target_clone, success)).await;
                 });
                 handles.push(handle);
@@ -229,7 +298,16 @@ pub async fn run_task_loop(
             let _ = updater_handle.await;
 
             if stopped {
-                let _ = store.set_status(&task_id, TaskStatus::Stopped.as_i32(), None, None, None, Some(Utc::now().timestamp_millis())).await;
+                let _ = store
+                    .set_status(
+                        &task_id,
+                        TaskStatus::Stopped.as_i32(),
+                        None,
+                        None,
+                        None,
+                        Some(Utc::now().timestamp_millis()),
+                    )
+                    .await;
                 let _ = scheduler.complete(&task_id).await;
                 return;
             }
@@ -237,30 +315,50 @@ pub async fn run_task_loop(
             if let Err(e) = cmd_impl.process_result(&task_dir).await {
                 error!("Post-processing failed: {}", e);
             }
-
         } else {
             // === 旧模式：进程执行 (Fallback) ===
             let cmd_dir = task_dir.join("commands").join(&cmd_id);
             if let Err(e) = tokio::fs::create_dir_all(&cmd_dir).await {
                 let msg = format!("无法创建命令目录 {}: {}", cmd_dir.display(), e);
-                let _ = tx.send(RunnerEvent::Error { message: msg, ts: Utc::now().timestamp_millis() });
+                let _ = tx.send(RunnerEvent::Error {
+                    message: msg,
+                    ts: Utc::now().timestamp_millis(),
+                });
                 return;
             }
 
             let stdout_path = cmd_dir.join("stdout.log");
             let stderr_path = cmd_dir.join("stderr.log");
 
-            let stdout_file = match OpenOptions::new().create(true).write(true).truncate(true).open(&stdout_path).await {
+            let stdout_file = match OpenOptions::new()
+                .create(true)
+                .write(true)
+                .truncate(true)
+                .open(&stdout_path)
+                .await
+            {
                 Ok(f) => f,
                 Err(e) => {
-                    let _ = tx.send(RunnerEvent::Error { message: format!("无法打开 stdout 日志: {}", e), ts: Utc::now().timestamp_millis() });
+                    let _ = tx.send(RunnerEvent::Error {
+                        message: format!("无法打开 stdout 日志: {}", e),
+                        ts: Utc::now().timestamp_millis(),
+                    });
                     return;
                 }
             };
-            let stderr_file = match OpenOptions::new().create(true).write(true).truncate(true).open(&stderr_path).await {
+            let stderr_file = match OpenOptions::new()
+                .create(true)
+                .write(true)
+                .truncate(true)
+                .open(&stderr_path)
+                .await
+            {
                 Ok(f) => f,
                 Err(e) => {
-                    let _ = tx.send(RunnerEvent::Error { message: format!("无法打开 stderr 日志: {}", e), ts: Utc::now().timestamp_millis() });
+                    let _ = tx.send(RunnerEvent::Error {
+                        message: format!("无法打开 stderr 日志: {}", e),
+                        ts: Utc::now().timestamp_millis(),
+                    });
                     return;
                 }
             };
@@ -281,9 +379,23 @@ pub async fn run_task_loop(
                 Ok(c) => c,
                 Err(e) => {
                     let msg = format!("启动进程失败 [{}]: {}", cmd_id, e);
-                    let _ = tx.send(RunnerEvent::Error { message: msg.clone(), ts: Utc::now().timestamp_millis() });
-                    let _ = store.set_status(&task_id, TaskStatus::Failed.as_i32(), None, Some(-1), Some(msg), Some(Utc::now().timestamp_millis())).await;
-                    let _ = scheduler.fail(&task_id, &format!("启动进程失败: {}", e)).await;
+                    let _ = tx.send(RunnerEvent::Error {
+                        message: msg.clone(),
+                        ts: Utc::now().timestamp_millis(),
+                    });
+                    let _ = store
+                        .set_status(
+                            &task_id,
+                            TaskStatus::Failed.as_i32(),
+                            None,
+                            Some(-1),
+                            Some(msg),
+                            Some(Utc::now().timestamp_millis()),
+                        )
+                        .await;
+                    let _ = scheduler
+                        .fail(&task_id, &format!("启动进程失败: {}", e))
+                        .await;
                     return;
                 }
             };
@@ -348,7 +460,16 @@ pub async fn run_task_loop(
 
     // 所有命令执行完毕
     let ts = Utc::now().timestamp_millis();
-    let _ = store.set_status(&task_id, TaskStatus::Done.as_i32(), Some(100), Some(0), None, Some(ts)).await;
+    let _ = store
+        .set_status(
+            &task_id,
+            TaskStatus::Done.as_i32(),
+            Some(100),
+            Some(0),
+            None,
+            Some(ts),
+        )
+        .await;
     let _ = tx.send(RunnerEvent::Exit { code: 0, ts });
     let _ = scheduler.complete(&task_id).await;
 

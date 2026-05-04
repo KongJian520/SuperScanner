@@ -1,9 +1,13 @@
+use crate::commands::{
+    BuiltinPortScanCommand, CommandRegistry, FscanCommand, HttpxCommand, NmapCommand,
+    NucleiCommand, PingCommand,
+};
 use crate::config::AppConfig;
 use crate::domain::traits::TaskStore;
-use crate::commands::{CommandRegistry, PingCommand, NmapCommand, HttpxCommand, NucleiCommand, BuiltinPortScanCommand};
-use crate::handler::{server_info_svc, tasks_svc_with_store};
-use crate::storage::file::FileTaskStore;
 use crate::engine::scheduler::{Scheduler, SqliteScheduler};
+use crate::handler::{server_info_svc, tasks_svc_with_store};
+use crate::nuclei_templates::NucleiTemplatesManager;
+use crate::storage::file::FileTaskStore;
 use crate::utils::logging;
 use crate::utils::signal::wait_for_double_ctrl_c;
 use anyhow::Context;
@@ -12,12 +16,14 @@ use std::sync::Arc;
 use tonic::transport::{Identity, Server, ServerTlsConfig};
 use tracing::{error, info};
 
+mod commands;
 mod config;
 mod domain;
 mod engine;
-mod commands;
 mod error;
 mod handler;
+mod nuclei_templates;
+mod rules;
 mod storage;
 mod utils;
 
@@ -53,7 +59,9 @@ async fn main() -> anyhow::Result<()> {
     // 初始化文件存储
     let tasks_dir = config.tasks_dir.clone();
     if !tasks_dir.exists() {
-        tokio::fs::create_dir_all(&tasks_dir).await.context("无法创建任务目录")?;
+        tokio::fs::create_dir_all(&tasks_dir)
+            .await
+            .context("无法创建任务目录")?;
     }
     let store = FileTaskStore::new(tasks_dir.clone());
     let store = Arc::new(store) as Arc<dyn TaskStore>;
@@ -62,13 +70,17 @@ async fn main() -> anyhow::Result<()> {
     let scheduler = Arc::new(
         SqliteScheduler::new(&config.root_dir)
             .await
-            .context("无法初始化任务调度器")?
+            .context("无法初始化任务调度器")?,
     );
 
     // 重启后恢复未完成任务（记录日志，暂不自动重新启动）
     match scheduler.recover_running().await {
         Ok(recovered) if !recovered.is_empty() => {
-            info!("检测到 {} 个未完成任务（上次运行中断），可手动重启: {:?}", recovered.len(), recovered);
+            info!(
+                "检测到 {} 个未完成任务（上次运行中断），可手动重启: {:?}",
+                recovered.len(),
+                recovered
+            );
         }
         Ok(_) => {}
         Err(e) => {
@@ -77,6 +89,7 @@ async fn main() -> anyhow::Result<()> {
     }
 
     // 初始化命令注册表
+    let nuclei_templates_manager = NucleiTemplatesManager::new(config.nuclei_templates.clone());
     let mut registry = CommandRegistry::new()
         .register(PingCommand)
         .register(BuiltinPortScanCommand);
@@ -101,13 +114,27 @@ async fn main() -> anyhow::Result<()> {
         .find(|t| t.tool_id == "nuclei")
         .and_then(|t| t.path.clone())
     {
-        registry = registry.register(NucleiCommand::new(nuclei_binary));
+        registry = registry.register(NucleiCommand::new(
+            nuclei_binary,
+            nuclei_templates_manager.clone(),
+        ));
+    }
+    if let Some(fscan_binary) = config
+        .tool_capabilities
+        .iter()
+        .find(|t| t.tool_id == "fscan")
+        .and_then(|t| t.path.clone())
+    {
+        registry = registry.register(FscanCommand::new(fscan_binary));
     }
     info!("已加载命令: {:?}", registry.list_commands());
 
     server_builder
         .add_service(tasks_svc_with_store(tasks_dir, store, registry))
-        .add_service(server_info_svc(config.tool_capabilities.clone()))
+        .add_service(server_info_svc(
+            config.tool_capabilities.clone(),
+            nuclei_templates_manager,
+        ))
         .serve_with_shutdown(addr, wait_for_double_ctrl_c())
         .await
         .map_err(|e| {

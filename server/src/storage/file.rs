@@ -3,10 +3,10 @@ use crate::domain::types::{TaskMetadata, TaskMetadataPatch};
 use crate::error::AppError;
 use async_trait::async_trait;
 use std::path::PathBuf;
+use std::sync::Arc;
 use tokio::fs;
 use tokio::io::AsyncWriteExt;
 use tokio::sync::Mutex;
-use std::sync::Arc;
 
 pub struct FileTaskStore {
     root_dir: PathBuf,
@@ -15,7 +15,10 @@ pub struct FileTaskStore {
 
 impl FileTaskStore {
     pub fn new(root_dir: PathBuf) -> Self {
-        Self { root_dir, write_lock: Arc::new(Mutex::new(())) }
+        Self {
+            root_dir,
+            write_lock: Arc::new(Mutex::new(())),
+        }
     }
 
     async fn get_task_path(&self, id: &str) -> PathBuf {
@@ -26,19 +29,23 @@ impl FileTaskStore {
         let _lock = self.write_lock.lock().await;
         let content = toml::to_string_pretty(meta)
             .map_err(|e| AppError::Storage(format!("序列化失败: {}", e)))?;
-        
+
         // 原子写入: 写入临时文件 -> 重命名
         let tmp_path = path.with_extension("tmp");
-        let mut file = fs::File::create(&tmp_path).await
+        let mut file = fs::File::create(&tmp_path)
+            .await
             .map_err(|e| AppError::Storage(format!("无法创建临时文件: {}", e)))?;
-        file.write_all(content.as_bytes()).await
+        file.write_all(content.as_bytes())
+            .await
             .map_err(|e| AppError::Storage(format!("写入失败: {}", e)))?;
-        file.flush().await
+        file.flush()
+            .await
             .map_err(|e| AppError::Storage(format!("刷新失败: {}", e)))?;
-        
-        fs::rename(&tmp_path, path).await
+
+        fs::rename(&tmp_path, path)
+            .await
             .map_err(|e| AppError::Storage(format!("重命名失败: {}", e)))?;
-            
+
         Ok(())
     }
 }
@@ -47,7 +54,8 @@ impl FileTaskStore {
 impl TaskStore for FileTaskStore {
     async fn list_tasks(&self) -> Result<Vec<TaskMetadata>, AppError> {
         let mut tasks = Vec::new();
-        let mut entries = fs::read_dir(&self.root_dir).await
+        let mut entries = fs::read_dir(&self.root_dir)
+            .await
             .map_err(|e| AppError::Storage(format!("无法读取任务目录: {}", e)))?;
 
         while let Ok(Some(entry)) = entries.next_entry().await {
@@ -64,7 +72,7 @@ impl TaskStore for FileTaskStore {
                 }
             }
         }
-        
+
         // 按创建时间倒序排序
         tasks.sort_by(|a, b| b.created_at.cmp(&a.created_at));
         Ok(tasks)
@@ -76,21 +84,23 @@ impl TaskStore for FileTaskStore {
             return Ok(None);
         }
 
-        let content = fs::read_to_string(&path).await
+        let content = fs::read_to_string(&path)
+            .await
             .map_err(|e| AppError::Storage(format!("读取任务失败: {}", e)))?;
         let meta = toml::from_str(&content)
             .map_err(|e| AppError::Storage(format!("解析任务失败: {}", e)))?;
-            
+
         Ok(Some(meta))
     }
 
     async fn create_task(&self, meta: &TaskMetadata) -> Result<(), AppError> {
         let task_dir = self.root_dir.join(&meta.id);
         if !task_dir.exists() {
-            fs::create_dir_all(&task_dir).await
+            fs::create_dir_all(&task_dir)
+                .await
                 .map_err(|e| AppError::Storage(format!("创建任务目录失败: {}", e)))?;
         }
-        
+
         // 创建子目录结构
         let _ = fs::create_dir_all(task_dir.join("commands")).await;
         let _ = fs::create_dir_all(task_dir.join("logs")).await;
@@ -106,23 +116,46 @@ impl TaskStore for FileTaskStore {
         }
 
         // 读取现有数据
-        let content = fs::read_to_string(&path).await
+        let content = fs::read_to_string(&path)
+            .await
             .map_err(|e| AppError::Storage(format!("读取任务失败: {}", e)))?;
         let mut meta: TaskMetadata = toml::from_str(&content)
             .map_err(|e| AppError::Storage(format!("解析任务失败: {}", e)))?;
 
         // 应用补丁
-        if let Some(v) = &patch.name { meta.name = v.clone(); }
-        if let Some(v) = &patch.description { meta.description = v.clone(); }
-        if let Some(v) = &patch.targets { meta.targets = v.clone(); }
-        if let Some(v) = patch.status { meta.status = v; }
-        if let Some(v) = patch.progress { meta.progress = v; }
-        if let Some(v) = patch.exit_code { meta.exit_code = v; }
-        if let Some(v) = &patch.error_message { meta.error_message = v.clone(); }
-        if let Some(v) = patch.updated_at { meta.updated_at = Some(v); }
-        if let Some(v) = patch.started_at { meta.started_at = Some(v); }
-        if let Some(v) = patch.finished_at { meta.finished_at = Some(v); }
-        if let Some(v) = &patch.log_path { meta.log_path = v.clone(); }
+        if let Some(v) = &patch.name {
+            meta.name = v.clone();
+        }
+        if let Some(v) = &patch.description {
+            meta.description = v.clone();
+        }
+        if let Some(v) = &patch.targets {
+            meta.targets = v.clone();
+        }
+        if let Some(v) = patch.status {
+            meta.status = v;
+        }
+        if let Some(v) = patch.progress {
+            meta.progress = v;
+        }
+        if let Some(v) = patch.exit_code {
+            meta.exit_code = v;
+        }
+        if let Some(v) = &patch.error_message {
+            meta.error_message = v.clone();
+        }
+        if let Some(v) = patch.updated_at {
+            meta.updated_at = Some(v);
+        }
+        if let Some(v) = patch.started_at {
+            meta.started_at = Some(v);
+        }
+        if let Some(v) = patch.finished_at {
+            meta.finished_at = Some(v);
+        }
+        if let Some(v) = &patch.log_path {
+            meta.log_path = v.clone();
+        }
 
         self.save_metadata(&path, &meta).await
     }
@@ -130,16 +163,25 @@ impl TaskStore for FileTaskStore {
     async fn delete_task(&self, id: &str) -> Result<(), AppError> {
         let task_dir = self.root_dir.join(id);
         if task_dir.exists() {
-            fs::remove_dir_all(&task_dir).await
+            fs::remove_dir_all(&task_dir)
+                .await
                 .map_err(|e| AppError::Storage(format!("删除任务失败: {}", e)))?;
         }
         Ok(())
     }
 
-    async fn set_status(&self, id: &str, status: i32, progress: Option<u8>, exit_code: Option<i32>, error: Option<String>, finished_at: Option<i64>) -> Result<(), AppError> {
+    async fn set_status(
+        &self,
+        id: &str,
+        status: i32,
+        progress: Option<u8>,
+        exit_code: Option<i32>,
+        error: Option<String>,
+        finished_at: Option<i64>,
+    ) -> Result<(), AppError> {
         let patch = TaskMetadataPatch {
             status: Some(status),
-            progress,  // 直接传递 Option，None 表示不更新
+            progress, // 直接传递 Option，None 表示不更新
             exit_code,
             error_message: error,
             finished_at,
@@ -149,13 +191,18 @@ impl TaskStore for FileTaskStore {
         self.update_task(id, &patch).await
     }
 
-    async fn reset_task_for_restart(&self, id: &str, now_ms: i64) -> Result<TaskMetadata, AppError> {
+    async fn reset_task_for_restart(
+        &self,
+        id: &str,
+        now_ms: i64,
+    ) -> Result<TaskMetadata, AppError> {
         let path = self.get_task_path(id).await;
         if !path.exists() {
             return Err(AppError::Storage("任务不存在".to_string()));
         }
 
-        let content = fs::read_to_string(&path).await
+        let content = fs::read_to_string(&path)
+            .await
             .map_err(|e| AppError::Storage(format!("读取任务失败: {}", e)))?;
         let mut meta: TaskMetadata = toml::from_str(&content)
             .map_err(|e| AppError::Storage(format!("解析任务失败: {}", e)))?;
@@ -233,7 +280,10 @@ mod tests {
         let store = FileTaskStore::new(dir.path().to_path_buf());
         let meta = make_meta("status-id", "status test");
         store.create_task(&meta).await.unwrap();
-        store.set_status("status-id", 2, Some(50), None, None, None).await.unwrap();
+        store
+            .set_status("status-id", 2, Some(50), None, None, None)
+            .await
+            .unwrap();
         let got = store.get_task("status-id").await.unwrap().unwrap();
         assert_eq!(got.status, 2);
         assert_eq!(got.progress, 50);
@@ -243,8 +293,14 @@ mod tests {
     async fn test_list_tasks() {
         let dir = tempdir().unwrap();
         let store = FileTaskStore::new(dir.path().to_path_buf());
-        store.create_task(&make_meta("id-1", "task 1")).await.unwrap();
-        store.create_task(&make_meta("id-2", "task 2")).await.unwrap();
+        store
+            .create_task(&make_meta("id-1", "task 1"))
+            .await
+            .unwrap();
+        store
+            .create_task(&make_meta("id-2", "task 2"))
+            .await
+            .unwrap();
         let tasks = store.list_tasks().await.unwrap();
         assert_eq!(tasks.len(), 2);
     }

@@ -1,0 +1,18 @@
+[tool]
+id = "httpx"
+name = "httpx"
+description = "HTTP asset fingerprint scanner"
+
+[command]
+args_template = ["-silent", "-json", "-u", "{{target}}"]
+
+[parse]
+format = "jsonl"
+field_mappings = { input = "target", host = "host", url = "url", title = "title", status_code = "status_code" }
+
+[normalize.maps.scheme]
+http = "http"
+https = "https"
+
+[persist]
+targets = ["target", "host", "url", "status_code", "title"]

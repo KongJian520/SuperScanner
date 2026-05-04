@@ -46,9 +46,7 @@ mod tests {
         let dir = tempdir().unwrap();
         // Note: tracing global subscriber can only be set once per process.
         // We just verify the directory exists after init.
-        let _guard = std::panic::catch_unwind(|| {
-            init(dir.path().to_path_buf(), "test.log")
-        });
+        let _guard = std::panic::catch_unwind(|| init(dir.path().to_path_buf(), "test.log"));
         assert!(dir.path().exists());
     }
 }

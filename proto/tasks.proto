@@ -95,6 +95,9 @@ message Task {
 
   // 扫描结果列表
   repeated ScanResult results = 14;
+
+  // 聚合后的安全发现
+  repeated Finding findings = 15;
 }
 
 message ScanResult {
@@ -105,6 +108,25 @@ message ScanResult {
   string service = 5;
   string tool = 6;
   string timestamp = 7;
+}
+
+message Finding {
+  int64 id = 1;
+  string dedupe_key = 2;
+  string finding_type = 3;
+  string severity = 4;
+  string title = 5;
+  string detail = 6;
+  string ip = 7;
+  int32 port = 8;
+  string protocol = 9;
+  string source_tool = 10;
+  string source_command = 11;
+  string metadata_json = 12;
+  int64 occurrences = 13;
+  string first_seen_at = 14;
+  string last_seen_at = 15;
+  string updated_at = 16;
 }
 
 // 任务状态枚举
@@ -136,6 +158,7 @@ enum ScanType {
   SCAN_TYPE_PORT = 1;
   SCAN_TYPE_FINGERPRINT = 2;
   SCAN_TYPE_POC = 3;
+  SCAN_TYPE_FSCAN = 4;
 }
 
 message WorkflowStep {
