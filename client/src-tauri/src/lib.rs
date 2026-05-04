@@ -18,6 +18,7 @@ pub fn run() {
             server_info::get_backends,
             server_info::get_server_info,
             server_info::delete_backend,
+            server_info::sync_nuclei_templates,
             tasks::list_tasks,
             tasks::get_task,
             tasks::create_task,

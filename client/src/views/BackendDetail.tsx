@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { BackendConfig } from '../types';
 import { getUsagePercentage } from '@/lib/utils';
 import { Activity, ArrowLeft, Check, Clock, Cpu, HardDrive, RefreshCcw, Server, Terminal, X } from 'lucide-react';
-import { useServerInfo } from '../hooks/use-scanner-api';
+import { useServerInfo, useSyncNucleiTemplates } from '../hooks/use-scanner-api';
 import { AnimatePresence, motion } from 'framer-motion';
 import { microInteraction, stateTransition } from '../lib/motion';
 import { Link } from 'react-router-dom';
@@ -15,7 +15,10 @@ interface BackendDetailProps {
 export const BackendDetail: React.FC<BackendDetailProps> = ({ backend }) => {
     const { t } = useTranslation();
     const { data: info, isLoading: loading, error, refetch } = useServerInfo(backend.id);
+    const syncNucleiTemplates = useSyncNucleiTemplates();
     const [refreshState, setRefreshState] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+    const [localPathInput, setLocalPathInput] = useState('');
+    const [repoUrlInput, setRepoUrlInput] = useState('');
     const resetTimer = useRef<number | null>(null);
 
     useEffect(() => {
@@ -23,6 +26,13 @@ export const BackendDetail: React.FC<BackendDetailProps> = ({ backend }) => {
             if (resetTimer.current) window.clearTimeout(resetTimer.current);
         };
     }, []);
+
+    useEffect(() => {
+        const templates = info?.nucleiTemplates;
+        if (!templates) return;
+        setLocalPathInput(templates.configuredLocalPath ?? '');
+        setRepoUrlInput(templates.repoUrl ?? '');
+    }, [info?.nucleiTemplates?.configuredLocalPath, info?.nucleiTemplates?.repoUrl]);
 
     const setRefreshFeedback = (state: 'idle' | 'loading' | 'success' | 'error') => {
         if (resetTimer.current) window.clearTimeout(resetTimer.current);
@@ -36,6 +46,16 @@ export const BackendDetail: React.FC<BackendDetailProps> = ({ backend }) => {
         setRefreshFeedback('loading');
         const result = await refetch();
         setRefreshFeedback(result.error ? 'error' : 'success');
+    };
+
+    const handleSyncTemplates = async () => {
+        await syncNucleiTemplates.mutateAsync({
+            backendId: backend.id,
+            localPath: localPathInput.trim() || undefined,
+            repoUrl: repoUrlInput.trim() || undefined,
+            clearLocalPath: localPathInput.trim().length === 0,
+        });
+        await refetch();
     };
 
     const formatBytes = (bytes: number) => {
@@ -202,6 +222,55 @@ export const BackendDetail: React.FC<BackendDetailProps> = ({ backend }) => {
                             </div>
                         </div>
 
+                        <div className="bg-card border border-border rounded-lg p-5 space-y-4">
+                            <div className="flex items-center justify-between gap-3">
+                                <h3 className="text-sm font-semibold text-foreground">
+                                    {t('backend_detail.nuclei_templates')}
+                                </h3>
+                                <button
+                                    onClick={handleSyncTemplates}
+                                    disabled={syncNucleiTemplates.isPending}
+                                    className="px-3 py-1.5 text-xs rounded-md border border-border bg-background hover:bg-accent disabled:opacity-50"
+                                >
+                                    {syncNucleiTemplates.isPending
+                                        ? t('backend_detail.syncing')
+                                        : t('backend_detail.sync_now')}
+                                </button>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                                    <span>{t('backend_detail.local_templates_path')}</span>
+                                    <input
+                                        value={localPathInput}
+                                        onChange={(e) => setLocalPathInput(e.target.value)}
+                                        className="h-9 rounded-md border border-border bg-background px-3 text-sm text-foreground"
+                                        placeholder={t('backend_detail.local_templates_path_placeholder')}
+                                    />
+                                </label>
+                                <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                                    <span>{t('backend_detail.templates_repo_url')}</span>
+                                    <input
+                                        value={repoUrlInput}
+                                        onChange={(e) => setRepoUrlInput(e.target.value)}
+                                        className="h-9 rounded-md border border-border bg-background px-3 text-sm text-foreground"
+                                        placeholder="https://github.com/projectdiscovery/nuclei-templates.git"
+                                    />
+                                </label>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-muted-foreground">
+                                <div>{t('backend_detail.templates_source')}: {info?.nucleiTemplates?.source || '-'}</div>
+                                <div>{t('backend_detail.templates_effective_path')}: {info?.nucleiTemplates?.effectivePath || '-'}</div>
+                                <div>{t('backend_detail.templates_cache_path')}: {info?.nucleiTemplates?.cachePath || '-'}</div>
+                                <div>{t('backend_detail.last_sync_unix')}: {info?.nucleiTemplates?.lastSyncUnix || 0}</div>
+                            </div>
+                            {info?.nucleiTemplates?.lastError ? (
+                                <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                                    {info.nucleiTemplates.lastError}
+                                </div>
+                            ) : null}
+                        </div>
 
                         </motion.div>
                     ) : loading ? (

@@ -1,5 +1,5 @@
 import {invoke} from '@tauri-apps/api/core';
-import {BackendConfig, ServerInfo, Task, TaskStatus} from '../types';
+import {BackendConfig, NucleiTemplatesStatus, ServerInfo, Task, TaskStatus} from '../types';
 
 export type ApiResult<T> = { ok: true; data: T } | { ok: false, error: string };
 
@@ -36,6 +36,7 @@ function mapRawToTask(raw: any): Task {
         progress,
         workflow: raw?.workflow ?? { steps: [] },
         results: raw?.results ?? [],
+        findings: Array.isArray(raw?.findings) ? raw.findings : [],
         vulnerabilities: raw?.vulnerabilities ?? [],
     };
 }
@@ -147,16 +148,6 @@ export async function getServerInfo(address: string, useTls?: boolean): Promise<
 }
 
 export function normalizeServerInfoDto(raw: any): ServerInfo {
-    const toNumber = (v: any, fallback = 0) => {
-        if (v === null || v === undefined || v === '') return fallback;
-        if (typeof v === 'number') return Number.isFinite(v) ? v : fallback;
-        if (typeof v === 'string') {
-            const n = Number(v.replace(/,/g, ''));
-            return Number.isFinite(n) ? n : fallback;
-        }
-        return Number.isFinite(Number(v)) ? Number(v) : fallback;
-    };
-
     return {
         hostname: raw?.hostname ?? '',
         os: raw?.os ?? '',
@@ -176,7 +167,58 @@ export function normalizeServerInfoDto(raw: any): ServerInfo {
                 path: tool?.path ?? '',
             }))
             : [],
+        nucleiTemplates: raw?.nucleiTemplates
+            ? {
+                source: raw.nucleiTemplates.source ?? '',
+                configuredLocalPath: raw.nucleiTemplates.configuredLocalPath ?? '',
+                effectivePath: raw.nucleiTemplates.effectivePath ?? '',
+                repoUrl: raw.nucleiTemplates.repoUrl ?? '',
+                cachePath: raw.nucleiTemplates.cachePath ?? '',
+                lastSyncUnix: toNumber(raw.nucleiTemplates.lastSyncUnix),
+                lastError: raw.nucleiTemplates.lastError ?? '',
+                syncSupported: !!raw.nucleiTemplates.syncSupported,
+            }
+            : undefined,
     };
+}
+
+const toNumber = (v: any, fallback = 0) => {
+    if (v === null || v === undefined || v === '') return fallback;
+    if (typeof v === 'number') return Number.isFinite(v) ? v : fallback;
+    if (typeof v === 'string') {
+        const n = Number(v.replace(/,/g, ''));
+        return Number.isFinite(n) ? n : fallback;
+    }
+    return Number.isFinite(Number(v)) ? Number(v) : fallback;
+};
+
+export async function syncNucleiTemplates(
+    address: string,
+    payload: { localPath?: string; repoUrl?: string; clearLocalPath?: boolean },
+    useTls?: boolean,
+): Promise<ApiResult<NucleiTemplatesStatus>> {
+    try {
+        const raw = await invoke<any>('sync_nuclei_templates', {
+            address,
+            use_tls: !!useTls,
+            local_path: payload.localPath ?? null,
+            repo_url: payload.repoUrl ?? null,
+            clear_local_path: !!payload.clearLocalPath,
+        });
+        const data: NucleiTemplatesStatus = {
+            source: raw?.source ?? '',
+            configuredLocalPath: raw?.configuredLocalPath ?? '',
+            effectivePath: raw?.effectivePath ?? '',
+            repoUrl: raw?.repoUrl ?? '',
+            cachePath: raw?.cachePath ?? '',
+            lastSyncUnix: toNumber(raw?.lastSyncUnix),
+            lastError: raw?.lastError ?? '',
+            syncSupported: !!raw?.syncSupported,
+        };
+        return {ok: true, data};
+    } catch (e) {
+        return {ok: false, error: textErr(e)};
+    }
 }
 
 export async function restartScan(address: string, id: string, useTls?: boolean): Promise<ApiResult<Task>> {
@@ -210,5 +252,6 @@ export default {
     getTask,
     listTasks,
     getServerInfo,
+    syncNucleiTemplates,
     streamTaskEvents,
 };

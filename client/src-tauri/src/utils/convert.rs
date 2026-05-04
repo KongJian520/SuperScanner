@@ -17,12 +17,26 @@ pub fn server_info_from_proto(p: server_info_proto::ServerInfoResponse) -> Serve
         load_average: p.load_average,
         disk_total_bytes: Some(p.disk_total_bytes),
         disk_free_bytes: Some(p.disk_free_bytes),
-        tools: p.tools.into_iter().map(|t| ToolCapabilityDto {
-            tool_id: t.tool_id,
-            available: t.available,
-            source: t.source,
-            path: t.path,
-        }).collect(),
+        tools: p
+            .tools
+            .into_iter()
+            .map(|t| ToolCapabilityDto {
+                tool_id: t.tool_id,
+                available: t.available,
+                source: t.source,
+                path: t.path,
+            })
+            .collect(),
+        nuclei_templates: p.nuclei_templates.map(|n| NucleiTemplatesStatusDto {
+            source: n.source,
+            configured_local_path: n.configured_local_path,
+            effective_path: n.effective_path,
+            repo_url: n.repo_url,
+            cache_path: n.cache_path,
+            last_sync_unix: n.last_sync_unix,
+            last_error: n.last_error,
+            sync_supported: n.sync_supported,
+        }),
     }
 }
 
@@ -41,10 +55,14 @@ fn ts_to_rfc3339(ts: Option<Timestamp>) -> Option<String> {
 fn workflow_from_proto(wf: Option<tasks_proto::Workflow>) -> WorkflowDto {
     match wf {
         Some(w) => WorkflowDto {
-            steps: w.steps.into_iter().map(|s| WorkflowStepDto {
-                r#type: s.r#type,
-                tool: s.tool,
-            }).collect(),
+            steps: w
+                .steps
+                .into_iter()
+                .map(|s| WorkflowStepDto {
+                    r#type: s.r#type,
+                    tool: s.tool,
+                })
+                .collect(),
         },
         None => WorkflowDto { steps: vec![] },
     }
@@ -61,10 +79,22 @@ pub fn task_from_proto(p: tasks_proto::Task) -> TaskDto {
         } else {
             Some(p.description)
         },
-        targets: if p.targets.is_empty() { None } else { Some(p.targets) },
+        targets: if p.targets.is_empty() {
+            None
+        } else {
+            Some(p.targets)
+        },
         status: p.status,
-        exit_code: if is_terminal || p.exit_code != 0 { Some(p.exit_code) } else { None },
-        error_message: if p.error_message.is_empty() { None } else { Some(p.error_message) },
+        exit_code: if is_terminal || p.exit_code != 0 {
+            Some(p.exit_code)
+        } else {
+            None
+        },
+        error_message: if p.error_message.is_empty() {
+            None
+        } else {
+            Some(p.error_message)
+        },
         progress: p.progress,
         created_at: ts_to_rfc3339(p.created_at),
         updated_at: ts_to_rfc3339(p.updated_at),
@@ -72,6 +102,7 @@ pub fn task_from_proto(p: tasks_proto::Task) -> TaskDto {
         finished_at: ts_to_rfc3339(p.finished_at),
         workflow: workflow_from_proto(p.workflow),
         results: p.results.into_iter().map(scan_result_from_proto).collect(),
+        findings: p.findings.into_iter().map(finding_from_proto).collect(),
     }
 }
 
@@ -87,13 +118,36 @@ pub fn scan_result_from_proto(p: tasks_proto::ScanResult) -> ScanResultDto {
     }
 }
 
+pub fn finding_from_proto(p: tasks_proto::Finding) -> FindingDto {
+    FindingDto {
+        id: p.id,
+        dedupe_key: p.dedupe_key,
+        finding_type: p.finding_type,
+        severity: p.severity,
+        title: p.title,
+        detail: p.detail,
+        ip: p.ip,
+        port: p.port,
+        protocol: p.protocol,
+        source_tool: p.source_tool,
+        source_command: p.source_command,
+        metadata_json: p.metadata_json,
+        occurrences: p.occurrences,
+        first_seen_at: p.first_seen_at,
+        last_seen_at: p.last_seen_at,
+        updated_at: p.updated_at,
+    }
+}
+
 pub fn task_event_from_proto(p: tasks_proto::TaskEvent) -> Option<TaskEventDto> {
     match p.ev {
-        Some(tasks_proto::task_event::Ev::Progress(p)) => Some(TaskEventDto::Progress(ProgressDto {
-            percent: p.percent,
-            message: p.message,
-            ts: ts_to_rfc3339(p.ts),
-        })),
+        Some(tasks_proto::task_event::Ev::Progress(p)) => {
+            Some(TaskEventDto::Progress(ProgressDto {
+                percent: p.percent,
+                message: p.message,
+                ts: ts_to_rfc3339(p.ts),
+            }))
+        }
         Some(tasks_proto::task_event::Ev::Log(l)) => Some(TaskEventDto::Log(LogChunkDto {
             subtask: l.subtask,
             text: l.text,
@@ -101,10 +155,12 @@ pub fn task_event_from_proto(p: tasks_proto::TaskEvent) -> Option<TaskEventDto> 
             offset: l.offset,
             ts: ts_to_rfc3339(l.ts),
         })),
-        Some(tasks_proto::task_event::Ev::TaskSnapshot(t)) => Some(TaskEventDto::TaskSnapshot(task_from_proto(t))),
-        Some(tasks_proto::task_event::Ev::Error(e)) => Some(TaskEventDto::Error(ErrorDto {
-            message: e.message,
-        })),
+        Some(tasks_proto::task_event::Ev::TaskSnapshot(t)) => {
+            Some(TaskEventDto::TaskSnapshot(task_from_proto(t)))
+        }
+        Some(tasks_proto::task_event::Ev::Error(e)) => {
+            Some(TaskEventDto::Error(ErrorDto { message: e.message }))
+        }
         None => None,
     }
 }
@@ -131,6 +187,7 @@ mod tests {
             progress: 0,
             workflow: None,
             results: vec![],
+            findings: vec![],
         };
         let dto = task_from_proto(proto);
         assert!(dto.description.is_none());
@@ -153,6 +210,7 @@ mod tests {
             progress: 0,
             workflow: None,
             results: vec![],
+            findings: vec![],
         };
         let dto = task_from_proto(proto);
         assert_eq!(dto.description, Some("some desc".to_string()));
@@ -166,7 +224,10 @@ mod tests {
 
     #[test]
     fn test_ts_to_rfc3339_valid_timestamp() {
-        let ts = prost_types::Timestamp { seconds: 0, nanos: 0 };
+        let ts = prost_types::Timestamp {
+            seconds: 0,
+            nanos: 0,
+        };
         let result = ts_to_rfc3339(Some(ts));
         assert!(result.is_some());
         assert!(result.unwrap().contains("1970"));

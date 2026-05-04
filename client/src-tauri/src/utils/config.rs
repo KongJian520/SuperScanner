@@ -83,7 +83,10 @@ pub async fn save_backend(record: BackendRecord) -> Result<BackendRecord> {
     }
     if new_record.created_at == 0 {
         new_record.created_at = Utc::now().timestamp_millis();
-        info!(created_at = new_record.created_at, "assigned created_at timestamp");
+        info!(
+            created_at = new_record.created_at,
+            "assigned created_at timestamp"
+        );
     }
 
     // replace records with same name (allowing multiple same-name entries if desired by id)

@@ -421,6 +421,41 @@ export function useServerInfo(backendId: string | null) {
   });
 }
 
+export function useSyncNucleiTemplates() {
+  const queryClient = useQueryClient();
+  const { data: backends } = useBackends();
+
+  return useMutation({
+    mutationFn: async (payload: {
+      backendId: string;
+      localPath?: string;
+      repoUrl?: string;
+      clearLocalPath?: boolean;
+    }) => {
+      const backend = backends?.find(b => b.id === payload.backendId);
+      if (!backend?.address) throw new Error('Backend not found');
+      const res = await api.syncNucleiTemplates(
+        backend.address,
+        {
+          localPath: payload.localPath,
+          repoUrl: payload.repoUrl,
+          clearLocalPath: payload.clearLocalPath,
+        },
+        !!backend.useTls,
+      );
+      if (!res.ok) throw new Error(res.error);
+      return res.data;
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['serverInfo', variables.backendId] });
+      toast.success(i18n.t('toast.nuclei_sync_success', { defaultValue: 'Nuclei templates synced' }));
+    },
+    onError: (err) => {
+      toast.error(i18n.t('toast.nuclei_sync_error', { defaultValue: 'Nuclei templates sync failed: {{message}}', message: getErrorMessage(err) }));
+    },
+  });
+}
+
 export type BackendHealthState = 'online' | 'offline' | 'unknown';
 export interface BackendHealthSnapshot {
   state: BackendHealthState;

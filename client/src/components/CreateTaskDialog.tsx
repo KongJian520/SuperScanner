@@ -31,7 +31,9 @@ export const CreateTaskDialog: React.FC = () => {
   const [fingerprintTools, setFingerprintTools] = useState<string[]>(['httpx']);
   const [pocEnabled, setPocEnabled] = useState(false);
   const [pocTools, setPocTools] = useState<string[]>(['nuclei']);
-  const [workflowTab, setWorkflowTab] = useState<'port' | 'fingerprint' | 'poc'>('port');
+  const [fscanEnabled, setFscanEnabled] = useState(false);
+  const [fscanTools, setFscanTools] = useState<string[]>(['fscan']);
+  const [workflowTab, setWorkflowTab] = useState<'port' | 'fingerprint' | 'poc' | 'fscan'>('port');
 
   const availableToolSet = React.useMemo(() => {
     const available = (serverInfo?.tools ?? []).filter((tool) => tool.available).map((tool) => tool.toolId);
@@ -40,6 +42,7 @@ export const CreateTaskDialog: React.FC = () => {
   const nmapAvailable = availableToolSet.has('nmap');
   const httpxAvailable = availableToolSet.has('httpx');
   const nucleiAvailable = availableToolSet.has('nuclei');
+  const fscanAvailable = availableToolSet.has('fscan');
 
   const handleCancel = () => navigate('/tasks');
 
@@ -54,6 +57,12 @@ export const CreateTaskDialog: React.FC = () => {
     setPocEnabled(false);
     setPocTools([]);
   }, [pocEnabled, nucleiAvailable]);
+
+  React.useEffect(() => {
+    if (!fscanEnabled || fscanAvailable) return;
+    setFscanEnabled(false);
+    setFscanTools([]);
+  }, [fscanEnabled, fscanAvailable]);
 
   React.useEffect(() => {
     if (selectedBackendId && availableBackends.some((backend) => backend.id === selectedBackendId)) return;
@@ -95,6 +104,13 @@ export const CreateTaskDialog: React.FC = () => {
             return;
         }
         pocTools.forEach(tool => steps.push({ type: ScanType.Poc, tool }));
+    }
+    if (fscanEnabled) {
+        if (fscanTools.length === 0) {
+            toast.error(t('create_task.error_select_fscan_tool'));
+            return;
+        }
+        fscanTools.forEach(tool => steps.push({ type: ScanType.Fscan, tool }));
     }
     if (steps.length === 0) {
         toast.error(t('create_task.error_select_workflow_step'));
@@ -171,18 +187,19 @@ export const CreateTaskDialog: React.FC = () => {
             {/* Workflow Configuration */}
             <div className="grid gap-4 border rounded-md p-4">
                 <Label className="text-base">{t('create_task.workflow_title')}</Label>
-                <div className="grid grid-cols-3 gap-2 rounded-md bg-muted/40 p-1">
+                <div className="grid grid-cols-4 gap-2 rounded-md bg-muted/40 p-1">
                   {[
                     { key: 'port', label: t('create_task.workflow_port_scan') },
                     { key: 'fingerprint', label: t('create_task.workflow_fingerprint') },
                     { key: 'poc', label: t('create_task.workflow_poc_verify') },
+                    { key: 'fscan', label: t('create_task.workflow_fscan') },
                   ].map((tab) => (
                     <Button
                       key={tab.key}
                       type="button"
                       variant={workflowTab === tab.key ? 'default' : 'ghost'}
                       size="sm"
-                      onClick={() => setWorkflowTab(tab.key as 'port' | 'fingerprint' | 'poc')}
+                      onClick={() => setWorkflowTab(tab.key as 'port' | 'fingerprint' | 'poc' | 'fscan')}
                       className="h-8"
                     >
                       {tab.label}
@@ -291,6 +308,42 @@ export const CreateTaskDialog: React.FC = () => {
                               className="h-3 w-3 rounded border-border"
                             />
                             {t('create_task.tool_nuclei')}
+                          </label>
+                        </div>
+                      )
+                    )}
+                  </div>
+                )}
+
+                {workflowTab === 'fscan' && (
+                  <div className="flex flex-col gap-2 rounded-md border p-3">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="scan-fscan"
+                        checked={fscanEnabled}
+                        disabled={!fscanAvailable}
+                        onChange={e => setFscanEnabled(e.target.checked)}
+                        className="h-4 w-4 rounded border-border text-primary focus:ring-primary disabled:opacity-50"
+                      />
+                      <Label htmlFor="scan-fscan" className="font-semibold">{t('create_task.workflow_fscan')}</Label>
+                    </div>
+                    {!fscanAvailable ? (
+                      <p className="ml-6 text-xs text-muted-foreground">{t('create_task.tool_unavailable')}</p>
+                    ) : (
+                      fscanEnabled && (
+                        <div className="ml-6 flex gap-4">
+                          <label className="flex items-center gap-2 text-sm cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={fscanTools.includes('fscan')}
+                              onChange={e => {
+                                if (e.target.checked) setFscanTools(['fscan']);
+                                else setFscanTools([]);
+                              }}
+                              className="h-3 w-3 rounded border-border"
+                            />
+                            {t('create_task.tool_fscan')}
                           </label>
                         </div>
                       )

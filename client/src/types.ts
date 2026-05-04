@@ -15,7 +15,8 @@ export enum ScanType {
   Unspecified = 0,
   Port = 1,
   Fingerprint = 2,
-  Poc = 3
+  Poc = 3,
+  Fscan = 4
 }
 
 export interface WorkflowStep {
@@ -46,6 +47,25 @@ export interface ScanResult {
   title?: string;
   evidence?: string;
   vulnStatus?: string;
+}
+
+export interface Finding {
+  id: number;
+  dedupeKey: string;
+  findingType: string;
+  severity: string;
+  title: string;
+  detail: string;
+  ip: string;
+  port: number;
+  protocol: string;
+  sourceTool: string;
+  sourceCommand: string;
+  metadataJson: string;
+  occurrences: number;
+  firstSeenAt: string;
+  lastSeenAt: string;
+  updatedAt: string;
 }
 
 export interface VulnerabilityRecord {
@@ -82,6 +102,7 @@ export interface Task {
   result?: string;
   workflow: Workflow;
   results: ScanResult[];
+  findings: Finding[];
   vulnerabilities?: VulnerabilityRecord[];
 }
 
@@ -114,6 +135,7 @@ export interface ServerInfo {
   diskTotalBytes: number;
   diskFreeBytes: number;
   tools: ToolCapability[];
+  nucleiTemplates?: NucleiTemplatesStatus;
 }
 
 export interface ToolCapability {
@@ -121,6 +143,17 @@ export interface ToolCapability {
   available: boolean;
   source: string;
   path: string;
+}
+
+export interface NucleiTemplatesStatus {
+  source: string;
+  configuredLocalPath: string;
+  effectivePath: string;
+  repoUrl: string;
+  cachePath: string;
+  lastSyncUnix: number;
+  lastError: string;
+  syncSupported: boolean;
 }
 
 export type TaskAction =

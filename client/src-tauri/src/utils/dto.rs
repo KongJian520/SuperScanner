@@ -22,6 +22,7 @@ pub struct ServerInfoDto {
     pub disk_total_bytes: Option<u64>,
     pub disk_free_bytes: Option<u64>,
     pub tools: Vec<ToolCapabilityDto>,
+    pub nuclei_templates: Option<NucleiTemplatesStatusDto>,
 }
 
 #[derive(Serialize, Debug, Clone)]
@@ -31,6 +32,19 @@ pub struct ToolCapabilityDto {
     pub available: bool,
     pub source: String,
     pub path: String,
+}
+
+#[derive(Serialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct NucleiTemplatesStatusDto {
+    pub source: String,
+    pub configured_local_path: String,
+    pub effective_path: String,
+    pub repo_url: String,
+    pub cache_path: String,
+    pub last_sync_unix: i64,
+    pub last_error: String,
+    pub sync_supported: bool,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
@@ -58,6 +72,27 @@ pub struct ScanResultDto {
 
 #[derive(Serialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
+pub struct FindingDto {
+    pub id: i64,
+    pub dedupe_key: String,
+    pub finding_type: String,
+    pub severity: String,
+    pub title: String,
+    pub detail: String,
+    pub ip: String,
+    pub port: i32,
+    pub protocol: String,
+    pub source_tool: String,
+    pub source_command: String,
+    pub metadata_json: String,
+    pub occurrences: i64,
+    pub first_seen_at: String,
+    pub last_seen_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Serialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct TaskDto {
     // Task properties exposed to the front-end
     pub id: String,
@@ -74,6 +109,7 @@ pub struct TaskDto {
     pub finished_at: Option<String>,
     pub workflow: WorkflowDto,
     pub results: Vec<ScanResultDto>,
+    pub findings: Vec<FindingDto>,
 }
 
 /// DTO used when creating a new task (deserialized from JSON input)
