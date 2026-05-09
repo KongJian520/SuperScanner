@@ -294,6 +294,7 @@ impl tasks_server::Tasks for TasksService {
             log_path: String::new(),
             progress: 0,
             workflow: workflow_model.clone(),
+            domain_state: workflow_model.initial_domain_state(),
         };
 
         self.store.create_task(&meta).await.map_err(Status::from)?;

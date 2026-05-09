@@ -134,6 +134,7 @@ impl Scheduler for NoopScheduler {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use sqlx::Row;
     use tempfile::tempdir;
 
     #[tokio::test]
@@ -148,6 +149,31 @@ mod tests {
 
         scheduler.enqueue("task-2").await.unwrap();
         scheduler.fail("task-2", "test failure").await.unwrap();
+
+        let db_url = format!(
+            "sqlite://{}",
+            dir.path().join("scheduler.db").to_string_lossy()
+        );
+        let pool = SqlitePool::connect(&db_url).await.unwrap();
+        let task1 = sqlx::query("SELECT status, failed_reason FROM task_queue WHERE task_id = ?")
+            .bind("task-1")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(task1.get::<String, _>("status"), "done");
+        assert_eq!(task1.get::<Option<String>, _>("failed_reason"), None);
+
+        let task2 = sqlx::query("SELECT status, failed_reason FROM task_queue WHERE task_id = ?")
+            .bind("task-2")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(task2.get::<String, _>("status"), "failed");
+        assert_eq!(
+            task2.get::<Option<String>, _>("failed_reason"),
+            Some("test failure".to_string())
+        );
+        pool.close().await;
     }
 
     #[tokio::test]
@@ -159,8 +185,14 @@ mod tests {
 
         // 模拟重启前有 running 的任务
         scheduler.enqueue("task-running").await.unwrap();
+        scheduler.enqueue("task-done").await.unwrap();
+        scheduler.complete("task-done").await.unwrap();
+        scheduler.enqueue("task-failed").await.unwrap();
+        scheduler.fail("task-failed", "boom").await.unwrap();
 
         let recovered = scheduler.recover_running().await.unwrap();
         assert!(recovered.contains(&"task-running".to_string()));
+        assert!(!recovered.contains(&"task-done".to_string()));
+        assert!(!recovered.contains(&"task-failed".to_string()));
     }
 }

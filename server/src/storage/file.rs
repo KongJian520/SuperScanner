@@ -241,6 +241,7 @@ mod tests {
             finished_at: None,
             log_path: String::new(),
             workflow: Workflow::default(),
+            domain_state: Default::default(),
         }
     }
 
