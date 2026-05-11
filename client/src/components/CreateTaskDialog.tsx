@@ -6,7 +6,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Button } from './ui/button';
-import { Server, Check } from 'lucide-react';
+import { Switch } from './ui/switch';
+import { Server, Check, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { ScanType, Workflow, WorkflowStep } from '../types';
@@ -33,7 +34,6 @@ export const CreateTaskDialog: React.FC = () => {
   const [pocTools, setPocTools] = useState<string[]>(['nuclei']);
   const [fscanEnabled, setFscanEnabled] = useState(false);
   const [fscanTools, setFscanTools] = useState<string[]>(['fscan']);
-  const [workflowTab, setWorkflowTab] = useState<'port' | 'fingerprint' | 'poc' | 'fscan'>('port');
 
   const availableToolSet = React.useMemo(() => {
     const available = (serverInfo?.tools ?? []).filter((tool) => tool.available).map((tool) => tool.toolId);
@@ -185,171 +185,151 @@ export const CreateTaskDialog: React.FC = () => {
             </div>
 
             {/* Workflow Configuration */}
-            <div className="grid gap-4 border rounded-md p-4">
+            <div className="grid gap-2 border rounded-md p-4">
                 <Label className="text-base">{t('create_task.workflow_title')}</Label>
-                <div className="grid grid-cols-4 gap-2 rounded-md bg-muted/40 p-1">
-                  {[
-                    { key: 'port', label: t('create_task.workflow_port_scan') },
-                    { key: 'fingerprint', label: t('create_task.workflow_fingerprint') },
-                    { key: 'poc', label: t('create_task.workflow_poc_verify') },
-                    { key: 'fscan', label: t('create_task.workflow_fscan') },
-                  ].map((tab) => (
-                    <Button
-                      key={tab.key}
-                      type="button"
-                      variant={workflowTab === tab.key ? 'default' : 'ghost'}
-                      size="sm"
-                      onClick={() => setWorkflowTab(tab.key as 'port' | 'fingerprint' | 'poc' | 'fscan')}
-                      className="h-8"
-                    >
-                      {tab.label}
-                    </Button>
-                  ))}
-                </div>
 
-                {workflowTab === 'port' && (
-                  <div className="flex flex-col gap-2 rounded-md border p-3">
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        id="scan-port"
-                        checked={portScanEnabled}
-                        onChange={e => setPortScanEnabled(e.target.checked)}
-                        className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
-                      />
-                      <Label htmlFor="scan-port" className="font-semibold">{t('create_task.workflow_port_scan')}</Label>
-                    </div>
-                    {portScanEnabled && (
-                      <div className="ml-6 flex flex-col gap-2">
-                        <div className="flex gap-4">
-                          {['builtin', ...(nmapAvailable ? ['nmap'] : [])].map((tool) => (
-                            <label key={tool} className="flex items-center gap-2 text-sm cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={portScanTools.includes(tool)}
-                                onChange={e => {
-                                  if (e.target.checked) setPortScanTools([...portScanTools, tool]);
-                                  else setPortScanTools(portScanTools.filter(t => t !== tool));
-                                }}
-                                className="h-3 w-3 rounded border-border"
-                              />
-                              {tool === 'builtin' ? t('create_task.tool_builtin') : t('create_task.tool_nmap')}
-                            </label>
-                          ))}
-                        </div>
-                        <p className="text-xs text-muted-foreground">{t('create_task.nmap_server_hint')}</p>
+                {[
+                  {
+                    key: 'port',
+                    label: t('create_task.workflow_port_scan'),
+                    enabled: portScanEnabled,
+                    onToggle: setPortScanEnabled,
+                    tools: [
+                      { id: 'builtin', label: t('create_task.tool_builtin') },
+                      ...(nmapAvailable ? [{ id: 'nmap', label: t('create_task.tool_nmap') }] : []),
+                    ],
+                    selectedTools: portScanTools,
+                    onToolToggle: (tool: string) => {
+                      setPortScanTools(prev =>
+                        prev.includes(tool) ? prev.filter(t => t !== tool) : [...prev, tool]
+                      );
+                    },
+                    hint: t('create_task.nmap_server_hint'),
+                  },
+                  {
+                    key: 'fingerprint',
+                    label: t('create_task.workflow_fingerprint'),
+                    enabled: fingerprintEnabled,
+                    onToggle: setFingerprintEnabled,
+                    available: httpxAvailable,
+                    tools: [{ id: 'httpx', label: t('create_task.tool_httpx') }],
+                    selectedTools: fingerprintTools,
+                    onToolToggle: (tool: string) => {
+                      setFingerprintTools(prev =>
+                        prev.includes(tool) ? [] : [tool]
+                      );
+                    },
+                  },
+                  {
+                    key: 'poc',
+                    label: t('create_task.workflow_poc_verify'),
+                    enabled: pocEnabled,
+                    onToggle: setPocEnabled,
+                    available: nucleiAvailable,
+                    tools: [{ id: 'nuclei', label: t('create_task.tool_nuclei') }],
+                    selectedTools: pocTools,
+                    onToolToggle: (tool: string) => {
+                      setPocTools(prev =>
+                        prev.includes(tool) ? [] : [tool]
+                      );
+                    },
+                  },
+                  {
+                    key: 'fscan',
+                    label: t('create_task.workflow_fscan'),
+                    enabled: fscanEnabled,
+                    onToggle: setFscanEnabled,
+                    available: fscanAvailable,
+                    tools: [{ id: 'fscan', label: t('create_task.tool_fscan') }],
+                    selectedTools: fscanTools,
+                    onToolToggle: (tool: string) => {
+                      setFscanTools(prev =>
+                        prev.includes(tool) ? [] : [tool]
+                      );
+                    },
+                  },
+                ].map((step, idx, arr) => (
+                  <React.Fragment key={step.key}>
+                    {idx > 0 && (
+                      <div className="flex justify-center">
+                        <ChevronDown size={16} className="text-muted-foreground/40" />
                       </div>
                     )}
-                  </div>
-                )}
+                    <div
+                      className={cn(
+                        "flex flex-col gap-2 rounded-md border p-3 transition-colors",
+                        step.enabled ? "border-primary/30 bg-primary/[0.02]" : "bg-muted/20"
+                      )}
+                    >
+                      <div className="flex items-center gap-3">
+                        <Switch
+                          id={`step-${step.key}`}
+                          checked={step.enabled}
+                          onCheckedChange={
+                            'available' in step && !step.available
+                              ? () => {}
+                              : step.onToggle
+                          }
+                          disabled={'available' in step ? !step.available : false}
+                        />
+                        <Label
+                          htmlFor={`step-${step.key}`}
+                          className={cn(
+                            "text-sm font-medium cursor-pointer select-none",
+                            'available' in step && !step.available && "opacity-50 cursor-not-allowed"
+                          )}
+                          onClick={() => {
+                            if ('available' in step && !step.available) return;
+                            step.onToggle(!step.enabled);
+                          }}
+                        >
+                          {step.label}
+                        </Label>
+                      </div>
 
-                {workflowTab === 'fingerprint' && (
-                  <div className="flex flex-col gap-2 rounded-md border p-3">
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        id="scan-fingerprint"
-                        checked={fingerprintEnabled}
-                        disabled={!httpxAvailable}
-                        onChange={e => setFingerprintEnabled(e.target.checked)}
-                        className="h-4 w-4 rounded border-border text-primary focus:ring-primary disabled:opacity-50"
-                      />
-                      <Label htmlFor="scan-fingerprint" className="font-semibold">{t('create_task.workflow_fingerprint')}</Label>
-                    </div>
-                    {!httpxAvailable ? (
-                      <p className="ml-6 text-xs text-muted-foreground">{t('create_task.tool_unavailable')}</p>
-                    ) : (
-                      fingerprintEnabled && (
-                        <div className="ml-6 flex gap-4">
-                          <label className="flex items-center gap-2 text-sm cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={fingerprintTools.includes('httpx')}
-                              onChange={e => {
-                                if (e.target.checked) setFingerprintTools(['httpx']);
-                                else setFingerprintTools([]);
-                              }}
-                              className="h-3 w-3 rounded border-border"
-                            />
-                            {t('create_task.tool_httpx')}
-                          </label>
+                      {'available' in step && !step.available ? (
+                        <p className="ml-11 text-xs text-muted-foreground">{t('create_task.tool_unavailable')}</p>
+                      ) : step.enabled ? (
+                        <div className="ml-11 flex flex-col gap-2">
+                          <div className="flex flex-wrap gap-2">
+                            {step.tools.map((tool) => {
+                              const isSelected = step.selectedTools.includes(tool.id);
+                              return (
+                                <button
+                                  key={tool.id}
+                                  type="button"
+                                  onClick={() => step.onToolToggle(tool.id)}
+                                  className={cn(
+                                    "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium border transition-colors",
+                                    isSelected
+                                      ? "bg-primary/10 border-primary text-primary hover:bg-primary/15"
+                                      : "bg-background border-border text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                                  )}
+                                >
+                                  <span
+                                    className={cn(
+                                      "w-1.5 h-1.5 rounded-full",
+                                      isSelected ? "bg-primary" : "bg-muted-foreground/30"
+                                    )}
+                                  />
+                                  {tool.label}
+                                </button>
+                              );
+                            })}
+                          </div>
+                          {'hint' in step && step.hint && (
+                            <p className="text-xs text-muted-foreground">{step.hint}</p>
+                          )}
                         </div>
-                      )
-                    )}
-                  </div>
-                )}
-
-                {workflowTab === 'poc' && (
-                  <div className="flex flex-col gap-2 rounded-md border p-3">
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        id="scan-poc"
-                        checked={pocEnabled}
-                        disabled={!nucleiAvailable}
-                        onChange={e => setPocEnabled(e.target.checked)}
-                        className="h-4 w-4 rounded border-border text-primary focus:ring-primary disabled:opacity-50"
-                      />
-                      <Label htmlFor="scan-poc" className="font-semibold">{t('create_task.workflow_poc_verify')}</Label>
+                      ) : null}
                     </div>
-                    {!nucleiAvailable ? (
-                      <p className="ml-6 text-xs text-muted-foreground">{t('create_task.tool_unavailable')}</p>
-                    ) : (
-                      pocEnabled && (
-                        <div className="ml-6 flex gap-4">
-                          <label className="flex items-center gap-2 text-sm cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={pocTools.includes('nuclei')}
-                              onChange={e => {
-                                if (e.target.checked) setPocTools(['nuclei']);
-                                else setPocTools([]);
-                              }}
-                              className="h-3 w-3 rounded border-border"
-                            />
-                            {t('create_task.tool_nuclei')}
-                          </label>
-                        </div>
-                      )
+                    {idx === arr.length - 1 && step.enabled && (
+                      <div className="flex justify-center">
+                        <ChevronDown size={16} className="text-primary/40" />
+                      </div>
                     )}
-                  </div>
-                )}
-
-                {workflowTab === 'fscan' && (
-                  <div className="flex flex-col gap-2 rounded-md border p-3">
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        id="scan-fscan"
-                        checked={fscanEnabled}
-                        disabled={!fscanAvailable}
-                        onChange={e => setFscanEnabled(e.target.checked)}
-                        className="h-4 w-4 rounded border-border text-primary focus:ring-primary disabled:opacity-50"
-                      />
-                      <Label htmlFor="scan-fscan" className="font-semibold">{t('create_task.workflow_fscan')}</Label>
-                    </div>
-                    {!fscanAvailable ? (
-                      <p className="ml-6 text-xs text-muted-foreground">{t('create_task.tool_unavailable')}</p>
-                    ) : (
-                      fscanEnabled && (
-                        <div className="ml-6 flex gap-4">
-                          <label className="flex items-center gap-2 text-sm cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={fscanTools.includes('fscan')}
-                              onChange={e => {
-                                if (e.target.checked) setFscanTools(['fscan']);
-                                else setFscanTools([]);
-                              }}
-                              className="h-3 w-3 rounded border-border"
-                            />
-                            {t('create_task.tool_fscan')}
-                          </label>
-                        </div>
-                      )
-                    )}
-                  </div>
-                )}
+                  </React.Fragment>
+                ))}
             </div>
 
             {/* Backend Selection */}
