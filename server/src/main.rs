@@ -92,7 +92,8 @@ async fn main() -> anyhow::Result<()> {
     let nuclei_templates_manager = NucleiTemplatesManager::new(config.nuclei_templates.clone());
     let mut registry = CommandRegistry::new()
         .register(PingCommand)
-        .register(BuiltinPortScanCommand);
+        .register(BuiltinPortScanCommand)
+        .register(NucleiCommand::new(config.nuclei_templates_dir.clone()));
     if let Some(nmap_binary) = config.nmap_binary.clone() {
         registry = registry.register(NmapCommand::new(
             nmap_binary,
@@ -107,17 +108,6 @@ async fn main() -> anyhow::Result<()> {
         .and_then(|t| t.path.clone())
     {
         registry = registry.register(HttpxCommand::new(httpx_binary));
-    }
-    if let Some(nuclei_binary) = config
-        .tool_capabilities
-        .iter()
-        .find(|t| t.tool_id == "nuclei")
-        .and_then(|t| t.path.clone())
-    {
-        registry = registry.register(NucleiCommand::new(
-            nuclei_binary,
-            nuclei_templates_manager.clone(),
-        ));
     }
     if let Some(fscan_binary) = config
         .tool_capabilities

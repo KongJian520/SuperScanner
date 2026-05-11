@@ -1,3 +1,4 @@
+pub mod nuclei;
 pub mod scheduler;
 pub mod worker;
 

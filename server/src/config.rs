@@ -56,6 +56,7 @@ pub struct AppConfig {
     pub nmap_timeout_secs: u64,
     pub tool_capabilities: Vec<ToolCapability>,
     pub nuclei_templates: NucleiTemplatesConfig,
+    pub nuclei_templates_dir: PathBuf,
 }
 
 #[derive(Debug, Clone)]
@@ -110,7 +111,7 @@ impl AppConfig {
             config_file.tools.httpx_binary.as_deref(),
             "httpx",
         );
-        let nuclei_binary = resolve_binary(
+        let _nuclei_binary = resolve_binary(
             "SUPERSCANNER_NUCLEI_BINARY",
             config_file.tools.nuclei_binary.as_deref(),
             "nuclei",
@@ -204,9 +205,9 @@ impl AppConfig {
             },
             ToolCapability {
                 tool_id: "nuclei".to_string(),
-                available: nuclei_binary.path.is_some(),
-                source: nuclei_binary.source,
-                path: nuclei_binary.path.clone(),
+                available: true,
+                source: "builtin".to_string(),
+                path: None,
             },
             ToolCapability {
                 tool_id: "fscan".to_string(),
@@ -215,6 +216,20 @@ impl AppConfig {
                 path: fscan_binary.path.clone(),
             },
         ];
+
+        // Determine effective nuclei templates directory
+        let nuclei_templates_dir = {
+            let local = nuclei_templates_local.as_deref()
+                .filter(|p| Path::new(p).is_dir());
+            let cache = Path::new(&nuclei_templates_cache);
+            if let Some(p) = local {
+                PathBuf::from(p)
+            } else if cache.is_dir() {
+                cache.to_path_buf()
+            } else {
+                cache.to_path_buf()
+            }
+        };
 
         Self {
             ip: args.ip,
@@ -232,6 +247,7 @@ impl AppConfig {
                 cache_path: nuclei_templates_cache,
                 repo_url: nuclei_templates_repo,
             },
+            nuclei_templates_dir,
         }
     }
 }
