@@ -38,8 +38,11 @@ impl AppState {
 
         info!(uri = %uri, use_tls, "creating new gRPC channel");
         let ep = Endpoint::from_shared(uri.clone())?
+            .connect_timeout(std::time::Duration::from_secs(5))
+            .timeout(std::time::Duration::from_secs(30))
             .keep_alive_timeout(std::time::Duration::from_secs(20))
-            .keep_alive_while_idle(true);
+            .keep_alive_while_idle(true)
+            .http2_keep_alive_interval(std::time::Duration::from_secs(10));
 
         let ch = ep.connect().await?;
         info!(uri = %uri, "gRPC channel connected");
