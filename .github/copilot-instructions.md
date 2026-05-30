@@ -6,27 +6,34 @@ This repository is a Rust workspace with a Tauri + React client.
 
 ### Rust workspace (from repo root)
 
-```powershell
+```bash
 cargo build --workspace
 cargo test --workspace --exclude SuperScannerClient
 ```
 
 Run a single Rust test:
 
-```powershell
+```bash
 cargo test -p SuperScannerServer storage::task_db::tests::test_create_targets_db_single_ip
 ```
 
 ### Client frontend (`client/`)
 
-```powershell
+```bash
 pnpm dev
 pnpm build
 ```
 
-### Tauri app (`client/src-tauri/` via workspace)
+### Tauri desktop app (recommended dev entrypoint)
 
-```powershell
+```bash
+cd client
+pnpm tauri dev
+```
+
+Alternative (Rust-only launch, no Vite dev server orchestration):
+
+```bash
 cargo run -p SuperScannerClient
 ```
 
@@ -35,9 +42,13 @@ cargo run -p SuperScannerClient
 There is no dedicated lint script in `client/package.json` and no repo-specific lint runner checked in.
 Use ecosystem defaults when needed:
 
-```powershell
+```bash
 cargo clippy --workspace --all-targets
 ```
+
+### Frontend tests
+
+There is currently no frontend test script in `client/package.json`; do not assume `pnpm test` exists.
 
 ## High-level architecture
 
@@ -57,6 +68,7 @@ Core runtime flow:
 3. Server `TasksService` persists metadata and task files, then starts/stops work via `BackgroundTaskRunner`.
 4. Worker executes command plugins from `CommandRegistry`, updates task progress/status, and writes per-task scan results into SQLite (`targets.db`).
 5. Task events stream from server gRPC → Tauri `window.emit("task-event://<id>")` → React `useTaskEvents` updates query cache.
+6. Findings/reporting data is surfaced both as task-level summary fields and server-side findings/report endpoints; keep proto/shared/server/client mappings aligned when touching scan result models.
 
 Persistence model:
 
@@ -70,6 +82,7 @@ Persistence model:
 - Keep task status values aligned with proto enum values (`PENDING=1`, `RUNNING=2`, etc.); server/shared/client all rely on the same numeric mapping.
 - New scanners follow the `ScannerCommand` plugin contract (`id`, `build_spec`, `init_db`, `execute_target`, `process_result`) and must be registered in `server/src/main.rs`.
 - Task creation normalizes targets (`sort + dedup`) and validates each target as IP or CIDR before persistence.
+- Tool availability is capability-driven: binary resolution prefers environment variables, then `server-config.toml`, then `PATH`; UI workflow options are enabled/disabled from `server_info.tools` capability results.
 - Tauri boundary naming is intentional:
   - Rust DTOs use `#[serde(rename_all = "camelCase")]` for frontend JSON.
   - Tauri `invoke` argument names often stay snake_case (`use_tls`) to match Rust command signatures.
