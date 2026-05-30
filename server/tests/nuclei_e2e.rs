@@ -1,16 +1,39 @@
 // E2E tests for the builtin Nuclei HTTP engine.
 // Exercises: engine loading, HTTP execution, matchers, findings pipeline, dedup.
 
-use super::*;
-use crate::engine::nuclei::executor::HttpExecutor;
-use crate::engine::nuclei::template;
-use crate::engine::nuclei::NucleiEngine;
-use crate::storage::task_db;
+use SuperScannerServer::engine::nuclei::executor::HttpExecutor;
+use SuperScannerServer::engine::nuclei::template;
+use SuperScannerServer::engine::nuclei::NucleiEngine;
+use SuperScannerServer::storage::task_db;
 use sqlx::sqlite::SqlitePoolOptions;
 use std::io::{Read, Write};
 use std::net::TcpListener;
 use std::time::Duration;
 use tempfile::TempDir;
+
+fn extract_ip(target: &str) -> Option<String> {
+    let t = target.trim();
+    let authority = t.split_once("://").map_or(t, |(_, r)| r.split('/').next().unwrap_or(""));
+    if let Some(end) = authority.strip_prefix('[').and_then(|a| a.find(']')) {
+        return Some(authority[1..end].to_string());
+    }
+    authority.rsplit_once(':').map_or(
+        if authority.is_empty() { None } else { Some(authority.to_string()) },
+        |(h, _)| if h.contains(':') { Some(authority.to_string()) } else { Some(h.to_string()) },
+    )
+}
+
+fn extract_port(target: &str) -> Option<i64> {
+    let t = target.trim();
+    let authority = t.split_once("://").map_or(t, |(_, r)| r.split('/').next().unwrap_or(""));
+    authority.rsplit_once(':').and_then(|(h, p)| {
+        if h.contains(':') { None } else { p.parse().ok() }
+    })
+}
+
+fn extract_scheme(target: &str) -> String {
+    target.trim().split_once("://").map_or("http".to_string(), |(s, _)| s.to_ascii_lowercase())
+}
 
 fn start_test_server(body: &'static str) -> (u16, impl Drop) {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();

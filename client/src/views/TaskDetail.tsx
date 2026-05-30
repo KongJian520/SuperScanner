@@ -11,8 +11,9 @@ import * as api from '../lib/api';
 import { TaskStatusBadge } from '../components/TaskStatusBadge';
 import { microInteraction } from '../lib/motion';
 import TaskPortsDetail from './TaskPortsDetail';
-import TaskResultPlaceholderDetail from './TaskResultPlaceholderDetail';
 import TaskFindingsDetail from './TaskFindingsDetail';
+import TaskAssetsDetail from './TaskAssetsDetail';
+import TaskAliveDetail from './TaskAliveDetail';
 
 export type TaskDetailSection = 'assets' | 'alive' | 'ports' | 'vulns';
 
@@ -382,9 +383,13 @@ export const TaskDetail: React.FC<TaskDetailProps> = ({ task, activeSection = 'a
           <div className="h-full rounded-xl border border-border bg-card/60 backdrop-blur-sm overflow-hidden">
             <TaskFindingsDetail task={task} embedded />
           </div>
+        ) : activeSection === 'assets' ? (
+          <div className="h-full rounded-xl border border-border bg-card/60 backdrop-blur-sm overflow-hidden">
+            <TaskAssetsDetail task={task} embedded />
+          </div>
         ) : (
-          <div className="h-full overflow-hidden">
-            <TaskResultPlaceholderDetail task={task} section={activeSection} embedded />
+          <div className="h-full rounded-xl border border-border bg-card/60 backdrop-blur-sm overflow-hidden">
+            <TaskAliveDetail task={task} embedded />
           </div>
         )}
       </div>
