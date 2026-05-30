@@ -12,6 +12,7 @@ import { TaskStatusBadge } from '../components/TaskStatusBadge';
 import { microInteraction } from '../lib/motion';
 import TaskPortsDetail from './TaskPortsDetail';
 import TaskResultPlaceholderDetail from './TaskResultPlaceholderDetail';
+import TaskFindingsDetail from './TaskFindingsDetail';
 
 export type TaskDetailSection = 'assets' | 'alive' | 'ports' | 'vulns';
 
@@ -30,32 +31,7 @@ const getProgressColor = (status: TaskStatus) => {
   }
 };
 
-const downloadTextFile = (content: string, fileName: string, mimeType: string) => {
-  const blob = new Blob([content], { type: mimeType });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = fileName;
-  document.body.appendChild(anchor);
-  anchor.click();
-  document.body.removeChild(anchor);
-  URL.revokeObjectURL(url);
-};
-
-const toCsv = (rows: Record<string, unknown>[]) => {
-  if (rows.length === 0) return '';
-  const columns = Object.keys(rows[0]);
-  const escape = (value: unknown) => {
-    const raw = value == null ? '' : String(value);
-    if (raw.includes('"') || raw.includes(',') || raw.includes('\n')) {
-      return `"${raw.replace(/"/g, '""')}"`;
-    }
-    return raw;
-  };
-  const header = columns.join(',');
-  const data = rows.map((row) => columns.map((column) => escape(row[column])).join(',')).join('\n');
-  return `${header}\n${data}`;
-};
+import { downloadTextFile, toCsv } from '../lib/export-utils';
 
 type ActionFeedback = 'idle' | 'loading' | 'success' | 'error';
 type ActionKey = 'start' | 'stop' | 'restart';
@@ -199,10 +175,7 @@ export const TaskDetail: React.FC<TaskDetailProps> = ({ task, activeSection = 'a
   const assetsCount = new Set(results.map((r) => r.ip).filter(Boolean)).size;
   const aliveCount = new Set(openResults.map((r) => r.ip).filter(Boolean)).size;
   const portsCount = openResults.length;
-  const vulnsCount = (task.vulnerabilities?.length ?? 0) + results.filter((row) => {
-    const raw = row as unknown as Record<string, unknown>;
-    return Boolean(raw.severity || raw.vulnerabilityId || raw.vuln || raw.vulnerability);
-  }).length;
+  const vulnsCount = task.findings?.length ?? 0;
 
   const tabs: Array<{ section: TaskDetailSection; title: string; count: number; activeClass: string }> = [
     {
@@ -404,6 +377,10 @@ export const TaskDetail: React.FC<TaskDetailProps> = ({ task, activeSection = 'a
         {activeSection === 'ports' ? (
           <div className="h-full rounded-xl border border-border bg-card/60 backdrop-blur-sm overflow-hidden">
             <TaskPortsDetail task={task} embedded />
+          </div>
+        ) : activeSection === 'vulns' ? (
+          <div className="h-full rounded-xl border border-border bg-card/60 backdrop-blur-sm overflow-hidden">
+            <TaskFindingsDetail task={task} embedded />
           </div>
         ) : (
           <div className="h-full overflow-hidden">

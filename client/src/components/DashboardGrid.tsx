@@ -18,7 +18,7 @@ import {
   Globe
 } from 'lucide-react';
 import { COLORS } from '../constants';
-import { ScanResult } from '../types';
+import { Finding, ScanResult } from '../types';
 
 // count-up hook
 function useCountUp(target: number, duration = 600, shouldStart = true, disabled = false) {
@@ -115,9 +115,10 @@ const ChartCard: React.FC<{
 
 interface DashboardGridProps {
   results: ScanResult[];
+  findings?: Finding[];
 }
 
-const DashboardGrid: React.FC<DashboardGridProps> = ({ results = [] }) => {
+const DashboardGrid: React.FC<DashboardGridProps> = ({ results = [], findings = [] }) => {
   const { t } = useTranslation();
   const shouldReduceMotion = !!useReducedMotion();
   const chartColors = [COLORS.blue, COLORS.purple, COLORS.green, COLORS.yellow, COLORS.red];
@@ -157,15 +158,26 @@ const DashboardGrid: React.FC<DashboardGridProps> = ({ results = [] }) => {
     const protocols = Object.entries(protocolCounts)
       .map(([name, value]) => ({ name, value }));
 
+    const findingsCount = findings.length;
+    const severityDistribution = [
+      { name: 'Critical', value: findings.filter(f => f.severity.toLowerCase() === 'critical').length },
+      { name: 'High', value: findings.filter(f => f.severity.toLowerCase() === 'high').length },
+      { name: 'Medium', value: findings.filter(f => f.severity.toLowerCase() === 'medium').length },
+      { name: 'Low', value: findings.filter(f => f.severity.toLowerCase() === 'low').length },
+      { name: 'Info', value: findings.filter(f => f.severity.toLowerCase() === 'info').length },
+    ];
+
     return {
       uniqueIps: uniqueIps.size,
       totalPorts,
       topPorts,
       topServices,
       protocols,
-      ips: Array.from(uniqueIps).slice(0, 20) // Show first 20 IPs
+      findingsCount,
+      severityDistribution,
+      ips: Array.from(uniqueIps).slice(0, 20),
     };
-  }, [results]);
+  }, [results, findings]);
 
   return (
     <div className="space-y-6">
@@ -174,7 +186,7 @@ const DashboardGrid: React.FC<DashboardGridProps> = ({ results = [] }) => {
         <StatCard title={t('dashboard.assets')} value={stats.uniqueIps} icon={<Layers size={80} />} color="blue" />
         <StatCard title={t('dashboard.alive_ips')} value={stats.uniqueIps} icon={<Globe size={80} />} color="green" />
         <StatCard title={t('dashboard.ports')} value={stats.totalPorts} icon={<Terminal size={80} />} color="purple" />
-        <StatCard title={t('dashboard.vulns')} value={0} icon={<ShieldAlert size={80} />} color="red" />
+        <StatCard title={t('dashboard.vulns')} value={stats.findingsCount} icon={<ShieldAlert size={80} />} color="red" />
       </div>
 
       {/* Main Grid of Details */}
@@ -299,11 +311,34 @@ const DashboardGrid: React.FC<DashboardGridProps> = ({ results = [] }) => {
           </ResponsiveContainer>
         </ChartCard>
 
-        {/* Vulnerabilities (Placeholder) */}
+        {/* Vulnerabilities */}
         <ChartCard title={t('dashboard.vulns')} icon={<ShieldAlert size={16} />} delay={0.4}>
-          <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
-            {t('dashboard.no_vuln_data')}
-          </div>
+          {stats.severityDistribution.some(d => d.value > 0) ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={stats.severityDistribution}
+                  cx="50%" cy="50%"
+                  innerRadius={50} outerRadius={80}
+                  paddingAngle={3}
+                  dataKey="value"
+                  isAnimationActive={!shouldReduceMotion}
+                >
+                  {stats.severityDistribution.map((_entry, index) => {
+                    const sevColors = ['#ef4444', '#f97316', '#eab308', '#3b82f6', '#6b7280'];
+                    return <Cell key={`sev-${index}`} fill={sevColors[index]} />;
+                  })}
+                </Pie>
+                <Tooltip
+                  contentStyle={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: '8px' }}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
+              {t('dashboard.no_vuln_data')}
+            </div>
+          )}
         </ChartCard>
       </div>
     </div>

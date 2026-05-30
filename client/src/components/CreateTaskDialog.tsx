@@ -135,15 +135,15 @@ export const CreateTaskDialog: React.FC = () => {
 
   return (
     <Dialog open={true} onOpenChange={(v) => !v && handleCancel()}>
-      <DialogContent className="sm:max-w-[600px] border-border/60 bg-background/95 supports-[backdrop-filter]:bg-background/85 backdrop-blur-sm data-[state=open]:duration-300 data-[state=closed]:duration-200 data-[state=open]:slide-in-from-top-2 data-[state=closed]:slide-out-to-top-2">
-        <DialogHeader className="motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-bottom-2 motion-safe:duration-300 motion-safe:[animation-delay:40ms] motion-safe:[animation-fill-mode:both]">
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col overflow-hidden border-border/60 bg-background/95 supports-[backdrop-filter]:bg-background/85 backdrop-blur-sm data-[state=open]:duration-300 data-[state=closed]:duration-200 data-[state=open]:slide-in-from-top-2 data-[state=closed]:slide-out-to-top-2">
+        <DialogHeader className="shrink-0 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-bottom-2 motion-safe:duration-300 motion-safe:[animation-delay:40ms] motion-safe:[animation-fill-mode:both]">
           <DialogTitle>{t('create_task.title')}</DialogTitle>
           <DialogDescription>
             {t('create_task.description')}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid gap-6 py-4 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-bottom-2 motion-safe:duration-300 motion-safe:[animation-delay:110ms] motion-safe:[animation-fill-mode:both]">
+        <div className="flex-1 overflow-y-auto grid gap-6 py-4 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-bottom-2 motion-safe:duration-300 motion-safe:[animation-delay:110ms] motion-safe:[animation-fill-mode:both]">
             {/* Targets */}
             <div className="grid gap-2">
                 <Label htmlFor="targets" className="text-base">{t('create_task.targets_label')}</Label>
@@ -368,7 +368,7 @@ export const CreateTaskDialog: React.FC = () => {
             </div>
         </div>
 
-        <DialogFooter className="motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-bottom-2 motion-safe:duration-300 motion-safe:[animation-delay:180ms] motion-safe:[animation-fill-mode:both]">
+        <DialogFooter className="shrink-0 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-bottom-2 motion-safe:duration-300 motion-safe:[animation-delay:180ms] motion-safe:[animation-fill-mode:both]">
           <Button variant="outline" onClick={handleCancel} disabled={isSubmitting}>
             {t('create_task.cancel')}
           </Button>

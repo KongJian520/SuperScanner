@@ -299,3 +299,7 @@ mod tests {
         assert_eq!(spec.id, "nuclei");
     }
 }
+
+#[cfg(test)]
+#[path = "nuclei_e2e_tests.rs"]
+mod nuclei_e2e_tests;
