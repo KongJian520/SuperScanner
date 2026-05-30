@@ -8,12 +8,16 @@ use tokio::fs;
 use tokio::io::AsyncWriteExt;
 use tokio::sync::Mutex;
 
+/// 基于文件系统的任务存储实现，将任务元数据保存为 TOML 文件
 pub struct FileTaskStore {
+    /// 任务存储根目录
     root_dir: PathBuf,
+    /// 写操作互斥锁，保证原子写入
     write_lock: Arc<Mutex<()>>,
 }
 
 impl FileTaskStore {
+    /// 创建新的文件任务存储实例
     pub fn new(root_dir: PathBuf) -> Self {
         Self {
             root_dir,
@@ -52,6 +56,7 @@ impl FileTaskStore {
 
 #[async_trait]
 impl TaskStore for FileTaskStore {
+    /// 列出所有任务（按创建时间倒序）
     async fn list_tasks(&self) -> Result<Vec<TaskMetadata>, AppError> {
         let mut tasks = Vec::new();
         let mut entries = fs::read_dir(&self.root_dir)
@@ -78,6 +83,7 @@ impl TaskStore for FileTaskStore {
         Ok(tasks)
     }
 
+    /// 获取单个任务元数据
     async fn get_task(&self, id: &str) -> Result<Option<TaskMetadata>, AppError> {
         let path = self.get_task_path(id).await;
         if !path.exists() {
@@ -93,6 +99,7 @@ impl TaskStore for FileTaskStore {
         Ok(Some(meta))
     }
 
+    /// 创建新任务及其目录结构
     async fn create_task(&self, meta: &TaskMetadata) -> Result<(), AppError> {
         let task_dir = self.root_dir.join(&meta.id);
         if !task_dir.exists() {
@@ -109,6 +116,7 @@ impl TaskStore for FileTaskStore {
         self.save_metadata(&path, meta).await
     }
 
+    /// 更新任务元数据（局部更新）
     async fn update_task(&self, id: &str, patch: &TaskMetadataPatch) -> Result<(), AppError> {
         let path = self.get_task_path(id).await;
         if !path.exists() {
@@ -160,6 +168,7 @@ impl TaskStore for FileTaskStore {
         self.save_metadata(&path, &meta).await
     }
 
+    /// 删除任务及其目录
     async fn delete_task(&self, id: &str) -> Result<(), AppError> {
         let task_dir = self.root_dir.join(id);
         if task_dir.exists() {
@@ -170,6 +179,7 @@ impl TaskStore for FileTaskStore {
         Ok(())
     }
 
+    /// 快捷设置任务状态及相关字段
     async fn set_status(
         &self,
         id: &str,
@@ -191,6 +201,7 @@ impl TaskStore for FileTaskStore {
         self.update_task(id, &patch).await
     }
 
+    /// 重置任务为 PENDING 状态，用于重新执行
     async fn reset_task_for_restart(
         &self,
         id: &str,

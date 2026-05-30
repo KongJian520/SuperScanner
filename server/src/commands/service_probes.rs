@@ -8,6 +8,7 @@ use tracing::warn;
 const DEFAULT_PROBES_PATH: &str =
     concat!(env!("CARGO_MANIFEST_DIR"), "/resources/nmap-service-probes");
 
+/// 服务探测匹配规则：包含服务名称、产品名称和正则表达式
 #[derive(Debug)]
 struct ProbeMatch {
     service: String,
@@ -15,12 +16,14 @@ struct ProbeMatch {
     regex: Regex,
 }
 
+/// 基于 nmap-service-probes 文件的服务探测匹配器
 #[derive(Debug, Default)]
 struct ServiceProbeMatcher {
     rules: Vec<ProbeMatch>,
 }
 
 impl ServiceProbeMatcher {
+    /// 从 nmap-service-probes 文件内容加载匹配规则
     fn from_content(content: &str) -> Self {
         let mut rules = Vec::new();
         for line in content.lines() {
@@ -39,6 +42,7 @@ impl ServiceProbeMatcher {
         Self { rules }
     }
 
+    /// 对 Banner 字节流进行匹配，返回识别出的服务名称
     fn match_service(&self, banner: &[u8]) -> Option<String> {
         self.rules.iter().find_map(|rule| {
             if rule.regex.is_match(banner) {
@@ -54,6 +58,7 @@ impl ServiceProbeMatcher {
     }
 }
 
+/// 解析 nmap-service-probes 格式的 match/softmatch 行
 fn parse_probe_line(line: &str, soft: bool) -> Option<ProbeMatch> {
     let prefix = if soft { "softmatch " } else { "match " };
     if !line.starts_with(prefix) {
@@ -96,6 +101,7 @@ fn parse_probe_line(line: &str, soft: bool) -> Option<ProbeMatch> {
     })
 }
 
+/// 解析 nmap 格式的定界符包裹的值（以 marker 字符开头，后跟定界符）
 fn parse_delimited(input: &str, marker: char) -> Option<(String, &str)> {
     let mut iter = input.char_indices();
     let (_, first) = iter.next()?;
@@ -124,6 +130,7 @@ fn parse_delimited(input: &str, marker: char) -> Option<(String, &str)> {
     None
 }
 
+/// 解析 nmap 探测行中的元数据字段（如 p/product, v/version 等）
 fn parse_fields(input: &str) -> HashMap<char, String> {
     let mut out = HashMap::new();
     let bytes = input.as_bytes();
@@ -174,6 +181,7 @@ fn parse_fields(input: &str) -> HashMap<char, String> {
     out
 }
 
+/// 规范化正则模式（如将 \\0 转为 \\x00）
 fn normalize_pattern(pattern: &str) -> String {
     pattern.replace("\\0", "\\x00")
 }
@@ -205,6 +213,7 @@ static MATCHER: Lazy<Option<ServiceProbeMatcher>> = Lazy::new(|| {
     }
 });
 
+/// 对服务 Banner 数据执行 nmap-service-probes 规则匹配，返回识别出的服务名
 pub fn match_service_banner(banner: &[u8]) -> Option<String> {
     if banner.is_empty() {
         return None;

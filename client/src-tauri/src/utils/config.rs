@@ -10,17 +10,24 @@ use tokio::task;
 use tracing::info;
 use uuid::Uuid;
 
+/// 后端服务器记录，包含名称、地址、TLS 开关和创建时间
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct BackendRecord {
+    /// 后端唯一标识（UUID）
     #[serde(default)]
     pub id: String,
+    /// 后端显示名称
     pub name: String,
+    /// 后端地址（host:port）
     pub address: String,
+    /// 可选描述信息
     #[serde(default)]
     pub description: Option<String>,
+    /// 是否启用 TLS 加密连接
     #[serde(default)]
     pub use_tls: bool,
+    /// 创建时间戳（Unix 毫秒）
     #[serde(default)]
     pub created_at: i64,
 }
@@ -40,6 +47,7 @@ fn backends_file() -> PathBuf {
     p
 }
 
+/// 从配置目录加载所有后端记录列表（若文件不存在则返回空列表）
 pub async fn load_backends() -> Result<Vec<BackendRecord>> {
     let f = backends_file();
     info!(path = ?f, "load_backends called");
@@ -52,6 +60,7 @@ pub async fn load_backends() -> Result<Vec<BackendRecord>> {
     Ok(v)
 }
 
+/// 保存后端记录到配置文件：同名称记录会合并更新，新记录自动分配 ID 和时间戳
 pub async fn save_backend(record: BackendRecord) -> Result<BackendRecord> {
     let dir = config_dir();
     fs::create_dir_all(&dir).await?;
@@ -122,6 +131,7 @@ pub async fn save_backend(record: BackendRecord) -> Result<BackendRecord> {
     Ok(saved_record)
 }
 
+/// 根据标识符（ID 或名称）删除后端记录，支持向后兼容的按名称删除
 pub async fn delete_backend(identifier: &str) -> Result<()> {
     // identifier may be either an id (UUID string) or a name (for backward compatibility)
     info!(identifier = %identifier, "delete_backend called");

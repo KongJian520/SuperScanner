@@ -10,6 +10,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use tokio::process::Command;
 
+/// HTTPX 指纹扫描命令，用于探测 Web 服务指纹
 #[derive(Clone)]
 pub struct HttpxCommand {
     binary: String,
@@ -17,6 +18,7 @@ pub struct HttpxCommand {
 }
 
 impl HttpxCommand {
+    /// 创建新的 httpx 命令实例
     pub fn new(binary: String) -> Self {
         Self {
             binary,
@@ -50,6 +52,7 @@ struct ParsedHttpxRecord {
     port: i32,
 }
 
+/// 将 JSON Value 转换为字符串（支持字符串、数字、布尔类型）
 fn string_from_json_value(v: &Value) -> Option<String> {
     match v {
         Value::String(s) => Some(s.clone()),
@@ -59,6 +62,7 @@ fn string_from_json_value(v: &Value) -> Option<String> {
     }
 }
 
+/// 根据字段映射表从 JSON 对象中提取字段（原始 key -> 规范化 key）
 fn extract_mapped_fields(
     object: &serde_json::Map<String, Value>,
     mappings: &HashMap<String, String>,
@@ -74,6 +78,7 @@ fn extract_mapped_fields(
     out
 }
 
+/// 通过点分隔路径从 JSON 对象中提取嵌套值
 fn extract_json_value_by_path<'a>(
     object: &'a serde_json::Map<String, Value>,
     path: &str,
@@ -87,6 +92,7 @@ fn extract_json_value_by_path<'a>(
     Some(current)
 }
 
+/// 对提取的字段应用规范化映射（如 scheme 别名统一）
 fn apply_normalize_maps(
     mut fields: HashMap<String, String>,
     maps: &HashMap<String, HashMap<String, String>>,
@@ -101,6 +107,7 @@ fn apply_normalize_maps(
     fields
 }
 
+/// 解析 URL，提取 scheme、host 和 port
 fn parse_url_host_port(url: &str) -> (Option<String>, Option<String>, Option<i32>) {
     let trimmed = url.trim();
     if trimmed.is_empty() {
@@ -142,6 +149,7 @@ fn parse_url_host_port(url: &str) -> (Option<String>, Option<String>, Option<i32
     (scheme_opt, Some(authority.to_string()), None)
 }
 
+/// 根据协议 scheme 返回默认端口号
 fn default_port_for_scheme(scheme: &str) -> i32 {
     match scheme {
         "https" => 443,
@@ -149,6 +157,7 @@ fn default_port_for_scheme(scheme: &str) -> i32 {
     }
 }
 
+/// 将 httpx JSON 行解析为结构化记录
 fn build_parsed_record(
     line: &str,
     rule: &ToolRuleSchema,
@@ -243,10 +252,12 @@ fn build_parsed_record(
     })
 }
 
+/// 判断是否应将 httpx 记录写入 findings（有标题或状态码 >=400）
 fn should_write_finding(record: &ParsedHttpxRecord) -> bool {
     record.title.is_some() || record.status_code.map(|c| c >= 400).unwrap_or(false)
 }
 
+/// 根据 HTTP 状态码确定发现项严重级别
 fn finding_severity(status_code: Option<i32>) -> &'static str {
     match status_code.unwrap_or_default() {
         500..=599 => "high",
@@ -256,6 +267,7 @@ fn finding_severity(status_code: Option<i32>) -> &'static str {
     }
 }
 
+/// 将目标地址中的特殊字符替换为下划线，生成安全的文件名
 fn sanitize_target_file_name(target: &str) -> String {
     target
         .chars()

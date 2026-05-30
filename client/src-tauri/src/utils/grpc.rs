@@ -4,6 +4,7 @@ use crate::state::AppState;
 use tonic::transport::Channel;
 use tracing::info;
 
+/// 创建 ServerInfo gRPC 客户端，复用 AppState 中的连接池
 pub async fn server_info_client(
     state: &AppState,
     addr: &str,
@@ -14,6 +15,7 @@ pub async fn server_info_client(
     Ok(server_info_client::ServerInfoClient::new(ch))
 }
 
+/// 创建 Tasks gRPC 客户端，复用 AppState 中的连接池
 pub async fn tasks_client(
     state: &AppState,
     addr: &str,

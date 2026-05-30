@@ -4,7 +4,7 @@ use crate::utils::dto::*;
 use chrono::TimeZone;
 use prost_types::Timestamp;
 
-/// Convert a ServerInfoResponse (from gRPC) into a UI-friendly DTO.
+/// 将 gRPC ServerInfoResponse 转换为前端友好的 DTO
 pub fn server_info_from_proto(p: server_info_proto::ServerInfoResponse) -> ServerInfoDto {
     ServerInfoDto {
         hostname: p.hostname,
@@ -68,7 +68,7 @@ fn workflow_from_proto(wf: Option<tasks_proto::Workflow>) -> WorkflowDto {
     }
 }
 
-/// Convert a Task proto message into a TaskDto used by the frontend.
+/// 将 gRPC Task 消息转换为前端使用的 TaskDto
 pub fn task_from_proto(p: tasks_proto::Task) -> TaskDto {
     let is_terminal = matches!(p.status, 3 | 4 | 5);
     TaskDto {
@@ -106,6 +106,7 @@ pub fn task_from_proto(p: tasks_proto::Task) -> TaskDto {
     }
 }
 
+/// 将 gRPC ScanResult 转换为 ScanResultDto
 pub fn scan_result_from_proto(p: tasks_proto::ScanResult) -> ScanResultDto {
     ScanResultDto {
         ip: p.ip,
@@ -118,6 +119,7 @@ pub fn scan_result_from_proto(p: tasks_proto::ScanResult) -> ScanResultDto {
     }
 }
 
+/// 将 gRPC Finding 转换为 FindingDto
 pub fn finding_from_proto(p: tasks_proto::Finding) -> FindingDto {
     FindingDto {
         id: p.id,
@@ -139,6 +141,7 @@ pub fn finding_from_proto(p: tasks_proto::Finding) -> FindingDto {
     }
 }
 
+/// 将 gRPC TaskEvent 转换为 TaskEventDto，根据事件类型分发到对应变体
 pub fn task_event_from_proto(p: tasks_proto::TaskEvent) -> Option<TaskEventDto> {
     match p.ev {
         Some(tasks_proto::task_event::Ev::Progress(p)) => {

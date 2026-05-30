@@ -53,6 +53,7 @@ impl CommandParser for SimpleCommandParser {
     }
 }
 
+/// 任务主循环：依次执行每个命令，更新状态和进度
 pub async fn run_task_loop(
     task_id: String,
     specs: Vec<CommandSpec>,

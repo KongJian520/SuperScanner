@@ -16,6 +16,7 @@ pub use super_scanner_shared::proto::tasks_proto;
 use status_proto::server_info_server;
 use tasks_proto::tasks_server;
 
+/// 创建 gRPC Tasks 服务的工厂函数（使用外部 TaskStore）
 pub fn tasks_svc_with_store(
     root: PathBuf,
     store: Arc<dyn TaskStore>,
@@ -24,6 +25,7 @@ pub fn tasks_svc_with_store(
     tasks_server::TasksServer::new(TasksService::new_with_store(root, store, registry))
 }
 
+/// 创建 gRPC ServerInfo 服务的工厂函数
 pub fn server_info_svc(
     tool_capabilities: Vec<ToolCapability>,
     templates_manager: NucleiTemplatesManager,

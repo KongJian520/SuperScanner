@@ -9,6 +9,7 @@ use std::time::Duration;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 
+/// 内置 TCP 端口扫描命令，扫描常用端口并获取服务 Banner
 pub struct BuiltinPortScanCommand;
 
 #[async_trait]
@@ -94,6 +95,7 @@ impl ScannerCommand for BuiltinPortScanCommand {
     }
 }
 
+/// 尝试连接目标端口并获取服务 Banner
 async fn grab_banner(target: &str, port: u16) -> Vec<u8> {
     let addr = format!("{}:{}", target, port);
     let connect = tokio::time::timeout(Duration::from_millis(600), TcpStream::connect(&addr)).await;
@@ -129,6 +131,7 @@ async fn grab_banner(target: &str, port: u16) -> Vec<u8> {
     out
 }
 
+/// 根据端口返回对应的探测载荷（HTTP 请求、SMTP EHLO 等）
 fn probe_payloads(target: &str, port: u16) -> Vec<String> {
     match port {
         80 | 8080 | 8000 | 8888 => vec![format!("GET / HTTP/1.0\r\nHost: {}\r\n\r\n", target)],
@@ -140,6 +143,7 @@ fn probe_payloads(target: &str, port: u16) -> Vec<String> {
     }
 }
 
+/// 根据端口号返回默认的服务名称（未识别 Banner 时的回退）
 fn fallback_service_by_port(port: u16) -> &'static str {
     match port {
         21 => "ftp",

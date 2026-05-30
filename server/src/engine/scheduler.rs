@@ -8,6 +8,7 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 
 #[async_trait]
+/// 任务调度器接口，定义任务队列生命周期管理
 pub trait Scheduler: Send + Sync + 'static {
     /// 将任务加入队列（queued 状态）
     async fn enqueue(&self, task_id: &str) -> Result<(), AppError>;
@@ -19,11 +20,14 @@ pub trait Scheduler: Send + Sync + 'static {
     async fn recover_running(&self) -> Result<Vec<String>, AppError>;
 }
 
+/// 基于 SQLite 的持久化调度器实现
 pub struct SqliteScheduler {
+    /// 数据库连接池（受互斥锁保护）
     pool: Arc<Mutex<SqlitePool>>,
 }
 
 impl SqliteScheduler {
+    /// 创建新的 SQLite 调度器，并初始化 task_queue 表
     pub async fn new(root_dir: &PathBuf) -> Result<Self, AppError> {
         let db_path = root_dir.join("scheduler.db");
         let db_url = format!("sqlite://{}", db_path.to_string_lossy());

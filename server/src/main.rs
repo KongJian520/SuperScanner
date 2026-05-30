@@ -27,6 +27,7 @@ mod rules;
 mod storage;
 mod utils;
 
+/// SuperScanner gRPC 服务端入口：初始化配置、存储、调度器和命令注册表，启动 gRPC 服务
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let config = AppConfig::load();
@@ -135,6 +136,7 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// 从配置目录加载 TLS 证书和私钥，返回 ServerTlsConfig
 async fn load_tls_config(config: &AppConfig) -> anyhow::Result<ServerTlsConfig> {
     let cert_path = config.certs_dir.join("server.pem");
     let key_path = config.certs_dir.join("server.key");

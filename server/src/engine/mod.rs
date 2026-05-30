@@ -15,24 +15,37 @@ use std::sync::Arc;
 use tokio::sync::{RwLock, broadcast, mpsc, watch};
 use tracing::info;
 
+/// 运行中任务的句柄，包含事件广播和停止控制
 pub struct RunnerHandle {
+    /// 事件广播发送器
     pub broadcaster: broadcast::Sender<RunnerEvent>,
     #[allow(dead_code)]
+    /// 任务协程的 JoinHandle
     pub join_handle: tokio::task::JoinHandle<()>,
+    /// 停止信号发送器
     pub stop_tx: mpsc::Sender<()>,
+    /// 取消信号发送器
     pub cancel_tx: watch::Sender<bool>,
 }
 
+/// 后台任务运行器，管理工作流执行生命周期
 pub struct BackgroundTaskRunner {
+    /// 任务目录根路径
     pub tasks_dir: PathBuf,
+    /// 任务存储
     pub store: Arc<dyn TaskStore>,
+    /// 当前正在运行的任务映射
     pub running_tasks: Arc<RwLock<HashMap<String, RunnerHandle>>>,
+    /// 命令解析器
     pub parser: Box<dyn CommandParser>,
+    /// 命令注册表
     pub registry: CommandRegistry,
+    /// 调度器
     pub scheduler: Arc<dyn Scheduler>,
 }
 
 impl BackgroundTaskRunner {
+    /// 创建新的后台任务运行器实例
     pub fn new(
         tasks_dir: PathBuf,
         store: Arc<dyn TaskStore>,
@@ -52,11 +65,13 @@ impl BackgroundTaskRunner {
 
 #[async_trait]
 impl TaskManager for BackgroundTaskRunner {
+    /// 启动任务执行（自动创建内部事件通道）
     async fn start(&self, id: &str) -> Result<i64, AppError> {
         let (tx, _) = mpsc::channel(100);
         self.start_with_event_sink(id, tx).await
     }
 
+    /// 启动任务执行并接入外部事件接收器
     async fn start_with_event_sink(
         &self,
         id: &str,
@@ -175,6 +190,7 @@ impl TaskManager for BackgroundTaskRunner {
         Ok(Utc::now().timestamp_millis())
     }
 
+    /// 停止正在运行的任务
     async fn stop(&self, id: &str) -> Result<(), AppError> {
         let mut tasks = self.running_tasks.write().await;
         if let Some(handle) = tasks.remove(id) {
@@ -184,6 +200,7 @@ impl TaskManager for BackgroundTaskRunner {
         Ok(())
     }
 
+    /// 为已运行的任务附加事件接收器
     async fn attach_event_sink(
         &self,
         id: &str,

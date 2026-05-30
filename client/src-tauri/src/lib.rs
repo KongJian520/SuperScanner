@@ -6,6 +6,7 @@ mod state;
 mod utils;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
+/// 初始化日志、创建 AppState 并启动 Tauri 应用，注册所有 IPC 命令处理器
 pub fn run() {
     let _guard = utils::logging::init(utils::ROOT_DIR.clone());
     tracing::info!("client_lib starting: initializing Tauri application");

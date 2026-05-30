@@ -7,6 +7,7 @@ use std::path::PathBuf;
 use std::process::Stdio;
 use tokio::process::Command;
 
+/// ICMP Ping 连通性测试命令
 pub struct PingCommand;
 
 #[async_trait]

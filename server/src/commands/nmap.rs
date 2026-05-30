@@ -8,6 +8,7 @@ use tokio::process::Command;
 use tokio::time::{Duration, timeout};
 use tracing::warn;
 
+/// Nmap 端口扫描命令
 #[derive(Clone)]
 pub struct NmapCommand {
     binary: String,
@@ -16,6 +17,7 @@ pub struct NmapCommand {
 }
 
 impl NmapCommand {
+    /// 创建新的 nmap 命令实例
     pub fn new(binary: String, default_args: Vec<String>, timeout_secs: u64) -> Self {
         Self {
             binary,

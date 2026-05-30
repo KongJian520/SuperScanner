@@ -24,6 +24,7 @@ use tonic::{Request, Response, Status};
 use tracing::{error, info};
 use uuid::Uuid;
 
+/// gRPC 任务管理服务，处理扫描任务的 CRUD 和事件流
 pub struct TasksService {
     root: PathBuf,
     runner: Arc<dyn TaskManager>,
@@ -32,6 +33,7 @@ pub struct TasksService {
 }
 
 impl TasksService {
+    /// 创建任务服务（使用默认 NoopScheduler）
     pub fn new_with_store(
         root: PathBuf,
         store: Arc<dyn TaskStore>,
@@ -54,6 +56,7 @@ impl TasksService {
         }
     }
 
+    /// 创建任务服务（使用外部 SqliteScheduler）
     pub fn new_with_scheduler(
         root: PathBuf,
         store: Arc<dyn TaskStore>,
@@ -74,6 +77,7 @@ impl TasksService {
         }
     }
 
+    /// 将毫秒时间戳转换为 protobuf Timestamp
     fn to_proto_ts(ms: Option<i64>) -> Option<Timestamp> {
         ms.map(|m| Timestamp {
             seconds: m / 1000,
@@ -81,6 +85,7 @@ impl TasksService {
         })
     }
 
+    /// 将 TaskMetadata 转换为 protobuf Task 消息
     fn metadata_to_proto(meta: TaskMetadata) -> ProtoTask {
         ProtoTask {
             id: meta.id,
@@ -101,6 +106,7 @@ impl TasksService {
         }
     }
 
+    /// 将 workflow step 类型映射为命令 ID
     fn map_step_to_command_id(step_type: i32, tool: &str) -> Option<String> {
         if tool == "builtin" {
             let mapped = match step_type {

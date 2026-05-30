@@ -11,6 +11,7 @@ use std::path::PathBuf;
 use tokio::process::Command;
 use tracing::warn;
 
+/// Fscan 快速内网扫描命令，用于端口扫描和服务发现
 #[derive(Clone)]
 pub struct FscanCommand {
     binary: String,
@@ -18,6 +19,7 @@ pub struct FscanCommand {
 }
 
 impl FscanCommand {
+    /// 创建新的 fscan 命令实例
     pub fn new(binary: String) -> Self {
         Self {
             binary,
@@ -50,6 +52,7 @@ struct ParsedFscanRecord {
     metadata_json: String,
 }
 
+/// 将目标地址中的特殊字符替换为下划线，生成安全的文件名
 fn sanitize_target_file_name(target: &str) -> String {
     target
         .chars()
@@ -60,6 +63,7 @@ fn sanitize_target_file_name(target: &str) -> String {
         .collect()
 }
 
+/// 将 JSON Value 转换为字符串（支持字符串、数字、布尔类型）
 fn string_from_json_value(v: &Value) -> Option<String> {
     match v {
         Value::String(s) => Some(s.clone()),
@@ -69,6 +73,7 @@ fn string_from_json_value(v: &Value) -> Option<String> {
     }
 }
 
+/// 通过点分隔路径从 JSON 对象中提取嵌套值
 fn extract_json_value_by_path<'a>(
     object: &'a serde_json::Map<String, Value>,
     path: &str,
@@ -82,6 +87,7 @@ fn extract_json_value_by_path<'a>(
     Some(current)
 }
 
+/// 根据字段映射表从 JSON 对象中提取字段（原始 key -> 规范化 key）
 fn extract_mapped_fields(
     object: &serde_json::Map<String, Value>,
     mappings: &HashMap<String, String>,
@@ -97,6 +103,7 @@ fn extract_mapped_fields(
     out
 }
 
+/// 对提取的字段应用规范化映射（如协议别名统一）
 fn apply_normalize_maps(
     mut fields: HashMap<String, String>,
     maps: &HashMap<String, HashMap<String, String>>,
@@ -115,6 +122,7 @@ fn apply_normalize_maps(
     fields
 }
 
+/// 解析端口字符串，支持纯数字和 "port/protocol" 格式
 fn parse_port(raw: &str) -> Option<i32> {
     let trimmed = raw.trim();
     if trimmed.is_empty() {
@@ -133,6 +141,7 @@ fn parse_port(raw: &str) -> Option<i32> {
     Some(candidate)
 }
 
+/// 将 fscan JSON 行解析为结构化记录
 fn build_parsed_record(
     line: &str,
     rule: &ToolRuleSchema,

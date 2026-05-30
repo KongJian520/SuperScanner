@@ -13,6 +13,7 @@ fn sanitize_event_segment(input: &str) -> String {
         .collect()
 }
 
+/// 列出指定后端的所有任务
 #[tauri::command]
 pub async fn list_tasks(
     state: State<'_, AppState>,
@@ -39,6 +40,7 @@ pub async fn list_tasks(
     Ok(tasks)
 }
 
+/// 根据 ID 获取单个任务的详细信息
 #[tauri::command]
 pub async fn get_task(
     state: State<'_, AppState>,
@@ -58,6 +60,7 @@ pub async fn get_task(
     Ok(convert::task_from_proto(task))
 }
 
+/// 创建新的扫描任务，指定名称、目标和工作流
 #[tauri::command]
 pub async fn create_task(
     state: State<'_, AppState>,
@@ -98,6 +101,7 @@ pub async fn create_task(
     Ok(convert::task_from_proto(task))
 }
 
+/// 启动指定任务
 #[tauri::command]
 pub async fn start_task(
     state: State<'_, AppState>,
@@ -119,6 +123,7 @@ pub async fn start_task(
     Ok(())
 }
 
+/// 停止正在运行的任务
 #[tauri::command]
 pub async fn stop_task(
     state: State<'_, AppState>,
@@ -137,6 +142,7 @@ pub async fn stop_task(
     Ok(())
 }
 
+/// 删除指定任务
 #[tauri::command]
 pub async fn delete_task(
     state: State<'_, AppState>,
@@ -159,6 +165,7 @@ pub async fn delete_task(
     Ok(())
 }
 
+/// 重启任务，可选清除日志和立即启动
 #[tauri::command]
 pub async fn restart_task(
     state: State<'_, AppState>,
@@ -189,6 +196,7 @@ pub async fn restart_task(
     Ok(convert::task_from_proto(task))
 }
 
+/// 流式监听任务事件（进度、日志、快照），通过 Tauri 事件系统推送到前端
 #[tauri::command]
 pub async fn stream_task_events(
     state: State<'_, AppState>,

@@ -6,6 +6,7 @@ pub mod logging;
 use once_cell::sync::Lazy;
 use std::{env, path::PathBuf};
 
+/// 全局根目录，由环境变量 SUPERSCANNER_HOMEDIR 控制，默认路径为 home/scanner-projects
 pub static ROOT_DIR: Lazy<PathBuf> = Lazy::new(|| {
     let base = if let Ok(env_dir) = env::var("SUPERSCANNER_HOMEDIR") {
         PathBuf::from(env_dir)

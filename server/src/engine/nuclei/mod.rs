@@ -9,12 +9,16 @@ use std::path::{Path, PathBuf};
 use template::{NucleiTemplate, TemplateFilter};
 use tracing::{info, warn};
 
+/// Nuclei 模板引擎，管理模板的加载、查询和过滤
 pub struct NucleiEngine {
+    /// 已加载的所有模板
     templates: Vec<NucleiTemplate>,
+    /// 按标签索引的模板下标映射
     by_tag: HashMap<String, Vec<usize>>,
 }
 
 impl NucleiEngine {
+    /// 创建空的模板引擎实例
     pub fn empty() -> Self {
         Self {
             templates: Vec::new(),
@@ -22,7 +26,7 @@ impl NucleiEngine {
         }
     }
 
-    /// Load all .yaml templates from a directory recursively.
+    /// 从目录递归加载所有 .yaml 模板文件
     pub async fn load_from_dir(dir: &Path) -> Result<Self, AppError> {
         let mut templates = Vec::new();
         load_templates_recursive(dir, &mut templates).await?;
@@ -43,21 +47,24 @@ impl NucleiEngine {
         Ok(Self { templates, by_tag })
     }
 
-    /// Reload templates from a directory.
+    /// 重新从目录加载模板
     pub async fn reload(&mut self, dir: &Path) -> Result<(), AppError> {
         let new_engine = Self::load_from_dir(dir).await?;
         *self = new_engine;
         Ok(())
     }
 
+    /// 返回已加载的模板数量
     pub fn template_count(&self) -> usize {
         self.templates.len()
     }
 
+    /// 返回所有已加载模板的引用
     pub fn all_templates(&self) -> &[NucleiTemplate] {
         &self.templates
     }
 
+    /// 根据过滤器筛选模板（标签包含/排除、严重级别、模板 ID）
     pub fn select_templates(&self, filter: &TemplateFilter) -> Vec<&NucleiTemplate> {
         if let Some(ids) = &filter.template_ids {
             return self
@@ -153,10 +160,12 @@ impl NucleiEngine {
         }
     }
 
+    /// 返回当前模板目录（当前未使用）
     pub fn templates_dir(&self) -> Option<&Path> {
         None
     }
 
+    /// 返回默认的 nuclei 模板目录路径
     pub fn default_dir() -> PathBuf {
         crate::config::ROOT_DIR.join("nuclei-templates")
     }

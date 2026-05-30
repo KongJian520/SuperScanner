@@ -7,11 +7,14 @@ use std::collections::HashMap;
 use std::time::Duration;
 use tracing::debug;
 
+/// HTTP 请求执行器，发送请求并执行匹配器/提取器
 pub struct HttpExecutor {
+    /// 复用的 reqwest HTTP 客户端
     client: reqwest::Client,
 }
 
 impl HttpExecutor {
+    /// 创建新的 HTTP 执行器，配置超时和 TLS 选项
     pub fn new() -> Result<Self, crate::error::AppError> {
         let client = reqwest::Client::builder()
             .connect_timeout(Duration::from_secs(10))
@@ -23,12 +26,12 @@ impl HttpExecutor {
         Ok(Self { client })
     }
 
+    /// 返回底层的 HTTP 客户端引用
     pub fn client(&self) -> &reqwest::Client {
         &self.client
     }
 
-    /// Execute a single template against a target.
-    /// Returns all matched results.
+    /// 对目标执行单个模板，返回所有匹配结果
     pub async fn execute_template(
         &self,
         template: &NucleiTemplate,

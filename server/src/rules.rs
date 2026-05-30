@@ -3,84 +3,115 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
 
+/// 完整的工具规则架构，包含元数据、命令、解析、规范化和持久化规则
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ToolRuleSchema {
+    /// 工具元数据
     pub tool: ToolMetadata,
+    /// 命令执行规则
     pub command: CommandRule,
+    /// 输出解析规则
     pub parse: ParseRule,
+    /// 字段值规范化规则
     pub normalize: NormalizeRule,
+    /// 持久化规则
     pub persist: PersistRule,
 }
 
+/// 工具的元数据：标识符、名称和描述
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ToolMetadata {
+    /// 工具的唯一标识符（如 "nmap"、"httpx"）
     pub id: String,
+    /// 工具的可读名称
     pub name: String,
+    /// 工具的可选描述
     pub description: Option<String>,
 }
 
+/// 命令规则，定义工具的执行参数模板
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CommandRule {
+    /// 参数模板列表，其中必须包含 `{{target}}` 占位符
     pub args_template: Vec<String>,
 }
 
+/// 解析规则，定义输出格式和字段映射关系
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParseRule {
+    /// 输出解析格式（json/jsonl/csv）
     pub format: ParseFormat,
+    /// 原始字段名到统一字段名的映射
     pub field_mappings: HashMap<String, String>,
 }
 
+/// 解析格式，支持 JSON、JSONL 和 CSV
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ParseFormat {
+    /// JSON 格式
     Json,
+    /// JSONL（每行一个 JSON 对象）格式
     Jsonl,
+    /// CSV 格式
     Csv,
 }
 
+/// 规范化规则，定义字段值的映射转换（如将不同输出统一为标准枚举值）
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct NormalizeRule {
+    /// 字段名到映射表的字典，用于将工具输出的原始值映射为标准值
     pub maps: HashMap<String, HashMap<String, String>>,
 }
 
+/// 持久化规则，定义需要持久化到数据库的字段列表
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PersistRule {
+    /// 需要持久化的目标字段名列表（须在 field_mappings 中有对应的映射）
     pub targets: Vec<String>,
 }
 
+/// 规则加载错误枚举，覆盖 IO 错误、解析错误和校验错误
 #[derive(Debug, Error)]
 pub enum RuleLoadError {
+    /// IO 错误：无法读取规则文件
     #[error("无法读取规则文件 {path}: {source}")]
     Io {
         path: PathBuf,
         #[source]
         source: std::io::Error,
     },
+    /// TOML 解析错误：规则文件语法错误
     #[error("规则文件 TOML 解析失败 {path}: {source}")]
     Parse {
         path: PathBuf,
         #[source]
         source: toml::de::Error,
     },
+    /// 校验错误：规则内容不符合规范
     #[error("规则文件校验失败 {path}: {message}")]
     Validation { path: PathBuf, message: String },
 }
 
+/// 规则加载器，从指定目录加载 TOML 格式的工具规则文件
 #[derive(Debug, Clone)]
 pub struct RuleLoader {
     rules_dir: PathBuf,
 }
 
 impl RuleLoader {
+    /// 创建一个新的规则加载器，指定规则文件目录
     pub fn new(rules_dir: PathBuf) -> Self {
         Self { rules_dir }
     }
 
+    /// 返回默认的规则文件目录（`resources/rules`）
     pub fn default_rules_dir() -> PathBuf {
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("resources")
             .join("rules")
     }
 
+    /// 加载指定工具的规则，返回解析并校验后的 ToolRuleSchema
     pub fn load(&self, tool: &str) -> Result<ToolRuleSchema, RuleLoadError> {
         let path = self.rules_dir.join(format!("{tool}.toml"));
         self.load_from_path(&path, tool)

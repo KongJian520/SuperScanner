@@ -1,7 +1,7 @@
-/// Replaces nuclei template variables in a string.
+/// 替换字符串中的 nuclei 模板变量
 ///
-/// Supported: {{BaseURL}}, {{Hostname}}, {{Host}}, {{Port}}, {{Scheme}},
-/// {{FQDN}}, {{Path}}, {{File}}, randstr-like placeholders.
+/// 支持的变量：{{BaseURL}}, {{Hostname}}, {{Host}}, {{Port}}, {{Scheme}},
+/// {{FQDN}}, {{Path}}, {{File}} 和 randstr 类占位符
 pub fn replace_variables(input: &str, target: &str) -> String {
     let parsed = parse_target_url(target);
 
@@ -24,6 +24,7 @@ pub fn replace_variables(input: &str, target: &str) -> String {
     result
 }
 
+/// 替换请求头中的模板变量和动态变量
 pub fn replace_headers(
     headers: &std::collections::HashMap<String, String>,
     target: &str,
@@ -38,6 +39,7 @@ pub fn replace_headers(
     out
 }
 
+/// 替换字符串中的动态变量（提取器结果）
 pub fn replace_dynamic_vars(input: &str, variables: &std::collections::HashMap<String, String>) -> String {
     let mut result = input.to_string();
     for (key, value) in variables {

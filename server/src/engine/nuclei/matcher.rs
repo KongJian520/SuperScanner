@@ -1,13 +1,19 @@
 use super::template::Matcher;
 use regex::Regex;
 
+/// 匹配上下文，包含 HTTP 响应的各个部分
 pub struct MatchContext<'a> {
+    /// 响应体内容
     pub body: &'a str,
+    /// 响应头内容
     pub headers: &'a str,
+    /// HTTP 状态码
     pub status_code: u16,
+    /// 响应体长度
     pub content_length: u64,
 }
 
+/// 批量评估匹配器，根据条件（and/or）合并结果
 pub fn evaluate_matchers(
     matchers: &[Matcher],
     condition: &str,
@@ -26,6 +32,7 @@ pub fn evaluate_matchers(
     }
 }
 
+/// 评估单个匹配器，根据类型分发到对应的匹配逻辑
 pub fn evaluate_single_matcher(matcher: &Matcher, ctx: &MatchContext) -> bool {
     let result = match matcher.matcher_type.as_str() {
         "word" => evaluate_word_matcher(matcher, ctx),
@@ -43,6 +50,7 @@ pub fn evaluate_single_matcher(matcher: &Matcher, ctx: &MatchContext) -> bool {
     }
 }
 
+/// 获取匹配器名称（当前始终返回 None）
 pub fn get_matcher_name(_matcher: &Matcher) -> Option<String> {
     None
 }
@@ -151,10 +159,10 @@ fn evaluate_size_matcher(matcher: &Matcher, ctx: &MatchContext) -> bool {
     ctx.content_length > 0
 }
 
-/// Simple DSL evaluator supporting common nuclei DSL expressions:
-/// - status_code == N / status_code_1 == N, etc.
+/// DSL 表达式求值器，支持常见的 nuclei DSL 语法：
+/// - status_code == N / status_code_1 == N 等
 /// - contains(body, "...") / contains(header, "...")
-/// - numeric comparisons
+/// - 数值比较
 pub fn evaluate_dsl_matcher(matcher: &Matcher, ctx: &MatchContext) -> bool {
     let expressions = match &matcher.dsl {
         Some(expressions) => expressions,

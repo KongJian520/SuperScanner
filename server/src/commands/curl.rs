@@ -6,6 +6,7 @@ use sqlx::sqlite::SqlitePool;
 use std::path::PathBuf;
 
 #[allow(dead_code)]
+/// HTTP 请求测试命令（基于 curl）
 pub struct CurlCommand;
 
 #[async_trait]

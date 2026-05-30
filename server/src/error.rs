@@ -1,6 +1,7 @@
 use thiserror::Error;
 use tonic::Status;
 
+/// 应用层错误枚举，覆盖配置、数据库、IO、任务和 TLS 等错误类型
 #[derive(Error, Debug)]
 pub enum AppError {
     #[error("配置错误: {0}")]

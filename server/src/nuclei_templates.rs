@@ -6,15 +6,24 @@ use std::sync::Arc;
 use tokio::process::Command;
 use tokio::sync::RwLock;
 
+/// nuclei 模板的状态快照，包含来源、路径和同步信息
 #[derive(Debug, Clone)]
 pub struct NucleiTemplatesStatus {
+    /// 模板来源（"local" / "cache" / "none"）
     pub source: String,
+    /// 配置的本地模板路径
     pub configured_local_path: String,
+    /// 当前生效的模板路径
     pub effective_path: String,
+    /// 模板仓库 URL
     pub repo_url: String,
+    /// 缓存路径
     pub cache_path: String,
+    /// 上次同步成功的时间戳（Unix 秒）
     pub last_sync_unix: i64,
+    /// 上次同步失败的错误信息
     pub last_error: String,
+    /// 是否支持自动同步
     pub sync_supported: bool,
 }
 
@@ -27,12 +36,14 @@ struct NucleiTemplatesState {
     last_error: Option<String>,
 }
 
+/// nuclei 模板管理器，负责模板的同步、状态查询和有效目录解析
 #[derive(Clone)]
 pub struct NucleiTemplatesManager {
     state: Arc<RwLock<NucleiTemplatesState>>,
 }
 
 impl NucleiTemplatesManager {
+    /// 创建新的模板管理器，使用给定的配置初始化内部状态
     pub fn new(config: NucleiTemplatesConfig) -> Self {
         Self {
             state: Arc::new(RwLock::new(NucleiTemplatesState {
@@ -45,6 +56,7 @@ impl NucleiTemplatesManager {
         }
     }
 
+    /// 返回当前生效的模板目录路径（若无可用的目录则返回 None）
     pub async fn effective_template_dir(&self) -> Option<String> {
         let status = self.status().await;
         if status.effective_path.is_empty() {
@@ -54,6 +66,7 @@ impl NucleiTemplatesManager {
         }
     }
 
+    /// 获取模板当前的状态信息，包括来源、路径、上次同步时间等
     pub async fn status(&self) -> NucleiTemplatesStatus {
         let state = self.state.read().await.clone();
         let local = state.local_path.clone().filter(|p| is_existing_dir(p));
@@ -82,6 +95,7 @@ impl NucleiTemplatesManager {
         }
     }
 
+    /// 立即同步 nuclei 模板：更新配置路径并发起 git pull/clone
     pub async fn sync_now(
         &self,
         local_path: Option<String>,

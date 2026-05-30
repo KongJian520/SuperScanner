@@ -4,17 +4,20 @@ use tokio::sync::Mutex;
 use tonic::transport::{Channel, Endpoint};
 use tracing::info;
 
+/// 应用全局状态，维护 gRPC 连接池（地址到 Channel 的映射）
 pub struct AppState {
     pool: Arc<Mutex<HashMap<String, Channel>>>,
 }
 
 impl AppState {
+    /// 创建一个新的空状态实例
     pub fn new() -> Self {
         Self {
             pool: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 
+    /// 获取（或创建）指定地址的 gRPC Channel，支持连接池复用
     pub async fn channel_for(
         &self,
         addr: &str,

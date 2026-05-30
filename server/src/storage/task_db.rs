@@ -6,47 +6,81 @@ use std::str::FromStr;
 
 /// 一行 port_results 记录
 pub struct PortRow {
+    /// IP 地址
     pub ip: String,
+    /// 端口号
     pub port: i64,
+    /// 传输协议（tcp/udp）
     pub protocol: String,
+    /// 端口状态（open/closed/filtered）
     pub state: String,
+    /// 服务名称
     pub service: String,
+    /// 检测工具名称
     pub tool: String,
+    /// 更新时间戳
     pub timestamp: String,
 }
 
 /// 一行 findings 记录
 pub struct FindingRow {
+    /// 自增主键 ID
     pub id: i64,
+    /// 去重键
     pub dedupe_key: String,
+    /// 发现类型（如 open_port、vulnerability）
     pub finding_type: String,
+    /// 严重级别（info/low/medium/high/critical）
     pub severity: String,
+    /// 发现标题
     pub title: String,
+    /// 发现详情
     pub detail: String,
+    /// 关联 IP 地址
     pub ip: String,
+    /// 关联端口号
     pub port: i64,
+    /// 关联协议
     pub protocol: String,
+    /// 来源工具名称
     pub source_tool: String,
+    /// 来源命令
     pub source_command: String,
+    /// 元数据 JSON
     pub metadata_json: String,
+    /// 出现次数
     pub occurrences: i64,
+    /// 首次发现时间
     pub first_seen_at: String,
+    /// 最近发现时间
     pub last_seen_at: String,
+    /// 最后更新时间
     pub updated_at: String,
 }
 
 /// 插入 findings 时的输入模型
 pub struct NewFinding {
+    /// 自定义去重键（为空时自动生成）
     pub dedupe_key: Option<String>,
+    /// 发现类型
     pub finding_type: String,
+    /// 严重级别
     pub severity: String,
+    /// 发现标题
     pub title: String,
+    /// 发现详情
     pub detail: Option<String>,
+    /// 关联 IP
     pub ip: Option<String>,
+    /// 关联端口
     pub port: Option<i64>,
+    /// 关联协议
     pub protocol: Option<String>,
+    /// 来源工具
     pub source_tool: Option<String>,
+    /// 来源命令
     pub source_command: Option<String>,
+    /// 元数据 JSON
     pub metadata_json: Option<String>,
 }
 

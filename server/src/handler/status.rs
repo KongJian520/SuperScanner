@@ -5,12 +5,14 @@ use async_trait::async_trait;
 use sysinfo::Disks;
 use tonic::{Request, Response, Status};
 
+/// gRPC 服务器信息服务，提供系统信息和工具能力查询
 pub struct ServerInfoService {
     tool_capabilities: Vec<ToolCapability>,
     templates_manager: NucleiTemplatesManager,
 }
 
 impl ServerInfoService {
+    /// 创建服务器信息服务实例
     pub fn new(
         tool_capabilities: Vec<ToolCapability>,
         templates_manager: NucleiTemplatesManager,
@@ -24,6 +26,7 @@ impl ServerInfoService {
 
 #[async_trait]
 impl server_info_server::ServerInfo for ServerInfoService {
+    /// 获取服务器系统信息（主机名、OS、CPU、内存、磁盘、工具能力等）
     async fn get_info(
         &self,
         _req: Request<ServerInfoRequest>,
@@ -99,6 +102,7 @@ impl server_info_server::ServerInfo for ServerInfoService {
         }
     }
 
+    /// 同步 Nuclei 模板（从远程仓库拉取或更新本地模板）
     async fn sync_nuclei_templates(
         &self,
         req: Request<crate::handler::status_proto::SyncNucleiTemplatesRequest>,

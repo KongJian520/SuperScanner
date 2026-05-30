@@ -12,6 +12,7 @@ use std::sync::Arc;
 use tokio::sync::OnceCell;
 use tracing::{debug, info, warn};
 
+/// Nuclei POC 扫描命令，使用内置 HTTP 引擎执行模板
 #[derive(Clone)]
 pub struct NucleiCommand {
     engine: Arc<OnceCell<NucleiEngine>>,
@@ -20,6 +21,7 @@ pub struct NucleiCommand {
 }
 
 impl NucleiCommand {
+    /// 创建新的 Nuclei 命令实例
     pub fn new(templates_dir: PathBuf) -> Self {
         let executor = HttpExecutor::new().unwrap_or_else(|e| {
             warn!("Failed to create HTTP executor: {}", e);
@@ -196,6 +198,7 @@ impl ScannerCommand for NucleiCommand {
     }
 }
 
+/// 规范化目标地址，无 scheme 时默认添加 http://
 fn normalize_target(target: &str) -> String {
     let trimmed = target.trim();
     if trimmed.is_empty() {
@@ -208,6 +211,7 @@ fn normalize_target(target: &str) -> String {
     format!("http://{}", trimmed)
 }
 
+/// 从目标 URL 中提取 IP 或域名
 fn extract_ip(target: &str) -> Option<String> {
     let t = target.trim();
     let authority = if let Some((_, rest)) = t.split_once("://") {
@@ -231,6 +235,7 @@ fn extract_ip(target: &str) -> Option<String> {
     None
 }
 
+/// 从目标 URL 中提取端口号
 fn extract_port(target: &str) -> Option<i64> {
     let t = target.trim();
     let authority = if let Some((_, rest)) = t.split_once("://") {
@@ -252,6 +257,7 @@ fn extract_port(target: &str) -> Option<i64> {
     None
 }
 
+/// 从目标 URL 中提取协议 scheme
 fn extract_scheme(target: &str) -> String {
     if let Some((scheme, _)) = target.trim().split_once("://") {
         scheme.to_ascii_lowercase()

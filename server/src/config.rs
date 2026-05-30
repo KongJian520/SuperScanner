@@ -27,6 +27,7 @@ pub static ROOT_DIR: Lazy<PathBuf> = Lazy::new(|| {
     base.join("scanner-projects")
 });
 
+/// 命令行参数解析，用于配置 gRPC 服务端的监听地址和 TLS 选项
 #[derive(Parser, Debug)]
 #[command(about = "SuperScanner gRPC 服务端", long_about = None)]
 pub struct CliArgs {
@@ -43,6 +44,7 @@ pub struct CliArgs {
     pub tls: bool,
 }
 
+/// 应用程序全局配置，包含监听地址、根目录、工具能力声明和 nuclei 模板配置
 #[derive(Debug, Clone)]
 pub struct AppConfig {
     pub ip: String,
@@ -59,6 +61,7 @@ pub struct AppConfig {
     pub nuclei_templates_dir: PathBuf,
 }
 
+/// 工具能力声明，记录某个扫描工具是否可用及其来源路径
 #[derive(Debug, Clone)]
 pub struct ToolCapability {
     pub tool_id: String,
@@ -67,6 +70,7 @@ pub struct ToolCapability {
     pub path: Option<String>,
 }
 
+/// nuclei 模板配置，包含本地路径、缓存路径和仓库地址
 #[derive(Debug, Clone)]
 pub struct NucleiTemplatesConfig {
     pub local_path: Option<String>,
@@ -96,6 +100,7 @@ struct ToolsConfigSection {
 }
 
 impl AppConfig {
+    /// 加载全局配置：合并命令行参数、环境变量和配置文件，返回 AppConfig
     pub fn load() -> Self {
         let args = CliArgs::parse();
         let config_file =
@@ -272,6 +277,7 @@ fn load_server_config_file(path: &Path) -> Option<ServerConfigFile> {
     toml::from_str::<ServerConfigFile>(&text).ok()
 }
 
+/// 持久化 nuclei 模板配置到 server-config.toml
 pub fn persist_nuclei_templates_config(
     local_path: Option<&str>,
     repo_url: &str,

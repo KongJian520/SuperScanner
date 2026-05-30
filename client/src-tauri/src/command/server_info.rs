@@ -9,6 +9,7 @@ use anyhow::Context;
 use tauri::State;
 use tracing::info;
 
+/// 探测指定后端的服务器信息，用于验证连接并获取运行状态
 #[tauri::command]
 pub async fn probe_server_info(
     state: State<'_, AppState>,
@@ -29,6 +30,7 @@ pub async fn probe_server_info(
     Ok(convert::server_info_from_proto(info_resp))
 }
 
+/// 获取指定后端的服务器信息（探活后再获取）
 #[tauri::command]
 pub async fn get_server_info(
     state: State<'_, AppState>,
@@ -40,6 +42,7 @@ pub async fn get_server_info(
     probe_server_info(state, address, use_tls).await
 }
 
+/// 添加后端：先执行探活，成功后将后端记录持久化到配置文件
 #[tauri::command]
 pub async fn add_backend_with_probe(
     state: State<'_, AppState>,
@@ -66,6 +69,7 @@ pub async fn add_backend_with_probe(
     Ok(saved)
 }
 
+/// 获取所有已保存的后端服务器记录列表
 #[tauri::command]
 pub async fn get_backends() -> Result<Vec<config::BackendRecord>> {
     info!("get_backends called");
@@ -76,6 +80,7 @@ pub async fn get_backends() -> Result<Vec<config::BackendRecord>> {
     Ok(v)
 }
 
+/// 根据标识符（ID 或名称）删除后端记录
 #[tauri::command]
 pub async fn delete_backend(identifier: String) -> Result<()> {
     info!(%identifier, "delete_backend called");
@@ -86,6 +91,7 @@ pub async fn delete_backend(identifier: String) -> Result<()> {
     Ok(())
 }
 
+/// 远程同步 nuclei 模板：发送同步请求到后端，返回更新后的模板状态
 #[tauri::command]
 pub async fn sync_nuclei_templates(
     state: State<'_, AppState>,
